@@ -44,7 +44,14 @@ const ASPECT_NAMES = {
   'opposition': 'опозиция',
 };
 
-const DownloadPDFButton = ({ targetId = 'report-content', fileName = 'Astrology_Report.pdf', natalChart = null, natalAspects = null }) => {
+const DownloadPDFButton = ({ 
+  targetId = 'report-content', 
+  fileName = 'Astrology_Report.pdf', 
+  natalChart = null, 
+  natalAspects = null,
+  monthlyResults = [], // for dynamic forecast (chunked monthly analysis)
+  staticInterpretation = null // for static mode (single interpretation)
+}) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Helper to extract input values
@@ -54,6 +61,11 @@ const DownloadPDFButton = ({ targetId = 'report-content', fileName = 'Astrology_
   };
 
   const handleDownload = async () => {
+    // Always generate DOCX for all reports
+    await handleDOCXDownload();
+    return;
+    
+    // OLD CODE - kept for reference but never executed
     const originalElement = document.getElementById(targetId);
     if (!originalElement) {
       alert('Грешка: Не е намерено съдържанието за експорт.');
@@ -482,6 +494,126 @@ const DownloadPDFButton = ({ targetId = 'report-content', fileName = 'Astrology_
     }
   };
 
+  // NEW: DOCX generation for periods > 2 months (testing)
+  const handleDOCXDownload = async () => {
+    setIsGenerating(true);
+    
+    try {
+      console.log('Starting DOCX generation...');
+      console.log('Monthly results count:', monthlyResults.length);
+      console.log('Static interpretation:', staticInterpretation ? 'Present' : 'None');
+      
+      // Prepare monthly_results: if static mode, wrap staticInterpretation as a single "month"
+      let finalMonthlyResults = monthlyResults;
+      if (monthlyResults.length === 0 && staticInterpretation) {
+        console.log('Using static interpretation as single month');
+        finalMonthlyResults = [
+          {
+            month: 'Анализ',
+            text: staticInterpretation
+          }
+        ];
+      }
+      
+      // Get user data
+      const nameInputs = document.querySelectorAll('input[type="text"]');
+      let userName = 'Неизвестен';
+      for (const input of nameInputs) {
+        const placeholder = input.placeholder?.toLowerCase() || '';
+        if (placeholder.includes('име') || placeholder.includes('name')) {
+          userName = input.value?.trim() || 'Неизвестен';
+          break;
+        }
+      }
+      
+      const selects = document.querySelectorAll('select');
+      let selectedCityName = '';
+      for (const select of selects) {
+        const options = Array.from(select.options);
+        if (options.length > 1 && options.some(opt => opt.text.includes('София') || opt.text.includes('Пловдив'))) {
+          const selectedOption = options[select.selectedIndex];
+          selectedCityName = selectedOption?.text?.trim() || selectedOption?.value?.trim() || '';
+          break;
+        }
+      }
+      
+      const reportTypeButtons = document.querySelectorAll('button[type="button"]');
+      let reportTypeText = 'Астрологичен Анализ';
+      for (const button of reportTypeButtons) {
+        if (button.classList.contains('bg-blue-600') || 
+            button.classList.contains('border-blue-500')) {
+          const labelSpan = button.querySelector('span.font-bold');
+          if (labelSpan) {
+            reportTypeText = labelSpan.innerText?.trim() || labelSpan.textContent?.trim() || 'Астрологичен Анализ';
+            break;
+          }
+        }
+      }
+      
+      // Determine API base URL
+      const API_BASE_URL = import.meta.env.MODE === 'development' 
+        ? 'http://localhost:8000' 
+        : 'https://astromind-api.onrender.com';
+      
+      console.log('API URL:', API_BASE_URL);
+      console.log('Sending data:', {
+        user_name: userName,
+        birth_date: getInputValue('date'),
+        birth_time: getInputValue('time'),
+        birth_city: selectedCityName,
+        report_type: reportTypeText,
+        monthly_results_count: finalMonthlyResults.length
+      });
+      
+      // Call backend to generate DOCX
+      const response = await fetch(`${API_BASE_URL}/generate-docx`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_name: userName,
+          birth_date: getInputValue('date'),
+          birth_time: getInputValue('time'),
+          birth_city: selectedCityName,
+          report_type: reportTypeText,
+          natal_chart: natalChart,
+          natal_aspects: natalAspects,
+          monthly_results: finalMonthlyResults
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Backend error:', errorText);
+        throw new Error(`DOCX generation failed: ${errorText}`);
+      }
+      
+      console.log('DOCX generated successfully');
+      
+      // Download the DOCX file
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName.replace('.pdf', '.docx');
+      link.click();
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('DOCX Error:', error);
+      console.error('Error details:', error.message);
+      alert(`Грешка при генериране на DOCX: ${error.message}\n\nПроверете конзолата за повече детайли.`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Determine button text based on month count
+  const getButtonText = () => {
+    return 'Свали Доклад (DOCX)';
+  };
+
   return (
     <button
       onClick={handleDownload}
@@ -496,7 +628,7 @@ const DownloadPDFButton = ({ targetId = 'report-content', fileName = 'Astrology_
       ) : (
         <>
           <FileText className="w-5 h-5" />
-          <span>Свали PDF Доклад (Формат A4)</span>
+          <span>{getButtonText()}</span>
         </>
       )}
     </button>

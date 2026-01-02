@@ -37,8 +37,10 @@ function App() {
   const [selectedPartnerCity, setSelectedPartnerCity] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [monthlyResults, setMonthlyResults] = useState([]); // For chunked PDF generation
 
   // Инициализация на транзитна дата с текущата дата
   useEffect(() => {
@@ -164,9 +166,141 @@ function App() {
     }));
   };
 
+  const handleDynamicForecastStreaming = async (API_BASE_URL, requestData) => {
+    return new Promise((resolve, reject) => {
+      // Use fetch with ReadableStream for POST requests with SSE
+      fetch(`${API_BASE_URL}/interpret-stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
+        body: JSON.stringify(requestData),
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        let monthlyResultsTemp = [];
+        let hasError = false;
+
+        const processText = (text) => {
+          buffer += text;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6); // Remove 'data: ' prefix
+              if (jsonStr.trim()) {
+                try {
+                  const data = JSON.parse(jsonStr);
+                  handleSSEMessage(data, monthlyResultsTemp, resolve, reject);
+                } catch (err) {
+                  console.error('Error parsing SSE data:', err, jsonStr);
+                }
+              }
+            }
+          }
+        };
+
+        const handleSSEMessage = (data, monthlyResultsTemp, resolve, reject) => {
+          switch (data.type) {
+            case 'start':
+              setLoadingMessage(`Започва генериране на прогноза за ${data.total_months} месеца...`);
+              // Set natal chart data with aspects immediately when stream starts
+              setResult(prev => ({
+                ...prev,
+                natal_chart: data.natal_chart || null,
+                partner_chart: data.partner_chart || null,
+                natal_aspects: data.natal_aspects || null,
+                partner_natal_aspects: data.partner_natal_aspects || null,
+                interpretation: ''
+              }));
+              break;
+              
+            case 'month_start':
+              setLoadingMessage(`Генериране на подробен месечен анализ за месец ${data.month}`);
+              break;
+              
+              case 'month_complete':
+              // Add monthly result immediately
+              monthlyResultsTemp.push({
+                month: data.month,
+                text: data.text
+              });
+              
+              // Update state with monthly results for PDF generation
+              setMonthlyResults([...monthlyResultsTemp]);
+              
+              // Update result with accumulated months
+              // Format with clean markdown for proper rendering in PDF
+              const formattedInterpretation = monthlyResultsTemp.map((m, idx) => {
+                const separator = idx > 0 ? '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' : '';
+                return `${separator}## 📅 ${m.month}\n\n${m.text}`;
+              }).join('\n\n');
+              
+              setResult(prev => ({
+                ...prev,
+                interpretation: formattedInterpretation,
+                natal_chart: prev?.natal_chart || null,
+                partner_chart: prev?.partner_chart || null
+              }));
+              break;
+              
+            case 'complete':
+              setLoadingMessage('');
+              resolve();
+              break;
+              
+            case 'error':
+              hasError = true;
+              setError(data.message || 'Грешка при генериране на прогноза');
+              reject(new Error(data.message));
+              break;
+          }
+        };
+
+        const pump = () => {
+          reader.read()
+            .then(({ done, value }) => {
+              if (done) {
+                if (!hasError) {
+                  resolve();
+                }
+                return;
+              }
+              
+              const text = decoder.decode(value, { stream: true });
+              processText(text);
+              pump();
+            })
+            .catch(err => {
+              console.error('Stream reading error:', err);
+              setError('Грешка при четене на данните');
+              reject(err);
+            });
+        };
+
+        pump();
+      })
+      .catch(error => {
+        console.error('Fetch error:', error);
+        setError('Грешка при свързване със сървъра');
+        reject(error);
+      });
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setLoadingMessage('');
     setError(null);
     setResult(null);
 
@@ -202,7 +336,9 @@ function App() {
       if (isDynamic) {
         // Dynamic Forecast Mode - използваме date range
         requestData.is_dynamic = true;
-        requestData.target_date = transitData.target_date || new Date().toISOString().split('T')[0];
+        // Use the start date from transitData (Начална дата field) or default to 01.01 of current year
+        const currentYear = new Date().getFullYear();
+        requestData.target_date = transitData.target_date || `${currentYear}-01-01`;
         requestData.end_date = endDate;
       } else {
         // Стандартен режим - транзитни данни
@@ -242,11 +378,18 @@ function App() {
       const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:8000' : 'https://astromind-api.onrender.com');
 
       // Изпращане на заявка
-      const response = await axios.post(`${API_BASE_URL}/interpret`, requestData, {
-        timeout: 300000  // 5 minutes timeout for chunked monthly requests
-      });
+      // Проверка дали е динамична прогноза - използваме streaming
+      if (isDynamic) {
+        // Use Server-Sent Events for streaming
+        await handleDynamicForecastStreaming(API_BASE_URL, requestData);
+      } else {
+        // Standard request
+        const response = await axios.post(`${API_BASE_URL}/interpret`, requestData, {
+          timeout: 300000  // 5 minutes timeout for chunked monthly requests
+        });
 
-      setResult(response.data);
+        setResult(response.data);
+      }
       
       // Запазване на данните в Local Storage
       if (name) {
@@ -726,11 +869,18 @@ function App() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      <span>
-                        {isDynamic 
-                          ? 'Генериране на подробен месечен анализ... Моля изчакайте' 
-                          : 'Изчисляване...'}
-                      </span>
+                      <div className="flex flex-col items-center gap-2">
+                        <span>
+                          {loadingMessage || (isDynamic 
+                            ? 'Генериране на подробен месечен анализ...' 
+                            : 'Изчисляване...')}
+                        </span>
+                        {(loading && (loadingMessage || isDynamic)) && (
+                          <span className="text-red-400 font-bold text-2xl animate-pulse">
+                            Моля изчакайте!
+                          </span>
+                        )}
+                      </div>
                     </>
                   ) : (
                     <>
@@ -806,6 +956,8 @@ function App() {
                   fileName={`Astrology_Report_${name || 'Chart'}_${new Date().toISOString().split('T')[0]}.pdf`}
                   natalChart={result.natal_chart}
                   natalAspects={result.natal_aspects || null}
+                  monthlyResults={monthlyResults}
+                  staticInterpretation={result.interpretation || null}
                 />
               </div>
             )}
@@ -839,7 +991,11 @@ function App() {
                 <div 
                   className="text-gray-200 leading-relaxed whitespace-pre-wrap"
                   dangerouslySetInnerHTML={{ 
-                    __html: result.interpretation.replace(/\n/g, '<br />') 
+                    __html: result.interpretation
+                      .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold text-purple-400 mt-6 mb-3">$1</h2>')
+                      .replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold text-purple-300 mt-4 mb-2">$1</h3>')
+                      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/\n/g, '<br />') 
                   }}
                 />
               </div>
