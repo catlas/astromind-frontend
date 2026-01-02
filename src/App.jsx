@@ -461,7 +461,7 @@ function App() {
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-300">
                     <Map className="w-4 h-4 inline mr-1" />
-                    Град
+                    Град на раждане
                   </label>
                   <select
                     value={selectedCity}
@@ -480,7 +480,7 @@ function App() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2 text-gray-300">
-                      Дата <span className="text-red-400">*</span>
+                      Дата на раждане <span className="text-red-400">*</span>
                     </label>
                     <input
                       type="date"
@@ -494,7 +494,7 @@ function App() {
                   
                   <div>
                     <label className="block text-sm font-medium mb-2 text-gray-300">
-                      Час <span className="text-red-400">*</span>
+                      Час на раждане <span className="text-red-400">*</span>
                     </label>
                     <input
                       type="time"
@@ -702,7 +702,7 @@ function App() {
                       <div>
                         <label className="block text-sm font-medium mb-2 text-gray-300">
                           <Map className="w-4 h-4 inline mr-1" />
-                          Град на партньора
+                          Град на раждане на партньора
                         </label>
                         <select
                           value={selectedPartnerCity}
