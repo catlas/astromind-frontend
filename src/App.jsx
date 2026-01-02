@@ -873,9 +873,9 @@ function App() {
                         <span>
                           {loadingMessage || (isDynamic 
                             ? 'Генериране на подробен месечен анализ...' 
-                            : 'Изчисляване...')}
+                            : 'ГЕНЕРИРАНЕ НА ПОДРОБЕН АНАЛИЗ')}
                         </span>
-                        {(loading && (loadingMessage || isDynamic)) && (
+                        {loading && (
                           <span className="text-red-400 font-bold text-2xl animate-pulse">
                             Моля изчакайте!
                           </span>
