@@ -87,14 +87,14 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
 
   return (
     <div className="bg-slate-800/70 backdrop-blur-sm rounded-lg p-6 border border-purple-800/30 space-y-6">
-      <h3 className="text-lg font-semibold text-purple-300 mb-4 flex items-center gap-2">
+      <h3 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
         <CheckCircle2 className="w-5 h-5" />
         Обобщена информация за картата
       </h3>
 
       {/* 1. Планетарни позиции */}
       <div className="space-y-2">
-        <h4 className="text-base font-semibold text-green-400 flex items-center gap-2">
+        <h4 className="text-base font-semibold text-slate-200 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           1. ПЛАНЕТАРНИ ПОЗИЦИИ
         </h4>
@@ -116,16 +116,16 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
             
             return (
               <div key={planetName} className="flex items-center justify-between py-1 px-3 bg-slate-700/30 rounded">
-                <span className="font-medium">{PLANET_NAMES[planetName] || planetName}:</span>
-                <span className="text-purple-300">{translatedPos}</span>
+                <span className="font-medium text-slate-200">{PLANET_NAMES[planetName] || planetName}:</span>
+                <span className="text-slate-300">{translatedPos}</span>
               </div>
             );
           })}
           {/* Добавяне на ASC */}
           {natalChart.angles && natalChart.angles.Ascendant !== null && natalChart.angles.Ascendant !== undefined && (
             <div className="flex items-center justify-between py-1 px-3 bg-slate-700/30 rounded">
-              <span className="font-medium">Асцендент:</span>
-              <span className="text-purple-300">
+              <span className="font-medium text-slate-200">Асцендент:</span>
+              <span className="text-slate-300">
                 {(() => {
                   const ascFormatted = natalChart.angles.Ascendant_formatted || _formatAngle(natalChart.angles.Ascendant);
                   let translatedAsc = ascFormatted;
@@ -144,7 +144,7 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
 
       {/* 2. Домове */}
       <div className="space-y-2">
-        <h4 className="text-base font-semibold text-green-400 flex items-center gap-2">
+        <h4 className="text-base font-semibold text-slate-200 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           2. ДОМОВЕ
         </h4>
@@ -155,10 +155,10 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
 
             return (
               <div key={houseNum} className="py-1 px-3 bg-slate-700/30 rounded">
-                <div className="font-medium text-blue-300">
+                <div className="font-medium text-slate-200">
                   {houseNum}-{_getHouseSuffix(houseNum)} дом:
                 </div>
-                <div className="text-purple-300 mt-1">
+                <div className="text-slate-300 mt-1">
                   {planets.length > 0 ? (
                     planets.map((p) => PLANET_NAMES[p] || p).join(', ')
                   ) : (
@@ -174,7 +174,7 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
       {/* 3. Аспекти */}
       {natalAspects && natalAspects.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-base font-semibold text-green-400 flex items-center gap-2">
+          <h4 className="text-base font-semibold text-slate-200 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
             3. АСПЕКТИ
           </h4>
@@ -186,12 +186,12 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
               
               return (
                 <div key={idx} className="py-1 px-3 bg-slate-700/30 rounded">
-                  <span className="font-medium">{planet1Name}</span>
-                  <span className="mx-2 text-purple-300">–</span>
-                  <span className="font-medium">{planet2Name}</span>
-                  <span className="ml-2 text-purple-300">{aspectName}</span>
+                  <span className="font-medium text-slate-200">{planet1Name}</span>
+                  <span className="mx-2 text-slate-300">–</span>
+                  <span className="font-medium text-slate-200">{planet2Name}</span>
+                  <span className="ml-2 text-slate-300">{aspectName}</span>
                   {aspect.orb !== undefined && (
-                    <span className="ml-2 text-xs text-gray-400">(орб: {aspect.orb.toFixed(2)}°)</span>
+                    <span className="ml-2 text-xs text-slate-400">(орб: {aspect.orb.toFixed(2)}°)</span>
                   )}
                 </div>
               );
