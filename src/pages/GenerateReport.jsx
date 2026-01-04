@@ -399,7 +399,7 @@ const GenerateReport = () => {
       } else {
         // Standard request
         const response = await axios.post(`${API_BASE_URL}/interpret`, requestData, {
-          timeout: 60000  // 60 seconds timeout
+          timeout: 90000  // 90 seconds timeout
         });
 
         setResult(response.data);
