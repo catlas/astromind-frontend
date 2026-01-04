@@ -1,0 +1,15 @@
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        {/* Тук по-късно ще добавим Dashboard и другите страници */}
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
