@@ -46,13 +46,13 @@ const Dashboard = () => {
             <span className="material-symbols-outlined">dashboard</span>
             <span className="text-sm font-medium">Табло</span>
           </button>
-          <button 
-            onClick={() => navigate('/generate-report')}
-            className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
-          >
-            <span className="material-symbols-outlined">auto_awesome</span>
-            <span className="text-sm font-medium">Генерирай отчет</span>
-          </button>
+              <button 
+                onClick={() => navigate('/generate-report')}
+                className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
+              >
+                <span className="material-symbols-outlined">auto_awesome</span>
+                <span className="text-sm font-medium">Генерирай хороскоп</span>
+              </button>
           <button className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all">
             <span className="material-symbols-outlined">groups</span>
             <span className="text-sm font-medium">Профили</span>
@@ -125,7 +125,7 @@ const Dashboard = () => {
                 className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
               >
                 <span className="material-symbols-outlined">auto_awesome</span>
-                <span className="text-sm font-medium">Генерирай отчет</span>
+                <span className="text-sm font-medium">Генерирай хороскоп</span>
               </button>
               <button 
                 onClick={() => setIsSidebarOpen(false)}
@@ -222,13 +222,20 @@ const Dashboard = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-4 pt-2">
                   <button 
+                    onClick={() => navigate('/generate-report')}
+                    className="flex cursor-pointer items-center justify-center gap-2 rounded-xl h-10 px-6 bg-[#5211d4] hover:bg-[#5211d4]/90 transition-all text-white text-sm font-bold shadow-lg shadow-[#5211d4]/20 animate-pulse"
+                  >
+                    <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                    Генерирай хороскоп
+                  </button>
+                  <button className="flex cursor-pointer items-center justify-center rounded-lg h-10 px-6 border border-white/10 hover:bg-white/5 transition-colors text-slate-400 text-sm font-medium">
+                    Виж транзакции
+                  </button>
+                  <button 
                     onClick={() => navigate('/buy-coins')}
                     className="flex cursor-pointer items-center justify-center rounded-lg h-10 px-6 bg-[#5211d4] hover:bg-[#5211d4]/90 transition-colors text-white text-sm font-bold shadow-lg shadow-[#5211d4]/20"
                   >
                     Зареди портфейл
-                  </button>
-                  <button className="flex cursor-pointer items-center justify-center rounded-lg h-10 px-6 bg-white/5 hover:bg-white/10 transition-colors text-white text-sm font-medium border border-white/10">
-                    Виж транзакции
                   </button>
                 </div>
               </div>
