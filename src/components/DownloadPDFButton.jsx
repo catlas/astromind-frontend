@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
-import { Download, Loader2, FileText } from 'lucide-react';
+import { Loader2, FileText } from 'lucide-react';
 
 // Български имена на планетите
 const PLANET_NAMES = {
