@@ -1,17 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { verifySession } from '../utils/auth';
 
 const BuyCoins = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-      navigate('/');
-    } else {
-      setUser(JSON.parse(userData));
-    }
+    let isMounted = true;
+
+    const loadUser = async () => {
+      const sessionUser = await verifySession(navigate);
+      if (isMounted && sessionUser) {
+        setUser(sessionUser);
+      }
+    };
+
+    loadUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   const pricingTiers = [
@@ -96,5 +105,4 @@ const BuyCoins = () => {
 };
 
 export default BuyCoins;
-
 

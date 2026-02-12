@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -7,19 +8,24 @@ const Dashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Проверка дали потребителят е влязъл
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-      navigate('/');
-    } else {
-      setUser(JSON.parse(userData));
-    }
+    let isMounted = true;
+
+    const loadUser = async () => {
+      const sessionUser = await verifySession(navigate);
+      if (isMounted && sessionUser) {
+        setUser(sessionUser);
+      }
+    };
+
+    loadUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/');
+    clearSessionAndRedirect(navigate);
   };
 
   if (!user) return null;

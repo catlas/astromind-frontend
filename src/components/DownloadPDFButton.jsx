@@ -582,6 +582,12 @@ const DownloadPDFButton = ({
       });
       
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/';
+          return;
+        }
         const errorText = await response.text();
         console.error('Backend error:', errorText);
         throw new Error(`DOCX generation failed: ${errorText}`);

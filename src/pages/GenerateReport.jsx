@@ -6,6 +6,7 @@ import AstroChart from '../components/AstroChart';
 import DownloadPDFButton from '../components/DownloadPDFButton';
 import ChartSummary from '../components/ChartSummary';
 import { bulgarianCities } from '../utils/bulgarianCities';
+import { clearSessionAndRedirect, getApiBaseUrl, verifySession } from '../utils/auth';
 
 const GenerateReport = () => {
   const navigate = useNavigate();
@@ -47,13 +48,16 @@ const GenerateReport = () => {
   const [monthlyResults, setMonthlyResults] = useState([]); // For chunked PDF generation
 
   useEffect(() => {
-    // Проверка дали потребителят е влязъл
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-      navigate('/');
-    } else {
-      setUser(JSON.parse(userData));
-    }
+    let isMounted = true;
+
+    const loadUser = async () => {
+      const sessionUser = await verifySession(navigate);
+      if (isMounted && sessionUser) {
+        setUser(sessionUser);
+      }
+    };
+
+    loadUser();
 
     // Инициализация на транзитна дата с текущата дата
     const now = new Date();
@@ -67,6 +71,9 @@ const GenerateReport = () => {
         target_time: currentTime,
       }));
     }
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   // Local Storage функции
@@ -179,6 +186,7 @@ const GenerateReport = () => {
   };
 
   const handleDynamicForecastStreaming = async (API_BASE_URL, requestData) => {
+    const token = localStorage.getItem('token');
     return new Promise((resolve, reject) => {
       // Use fetch with ReadableStream for POST requests with SSE
       fetch(`${API_BASE_URL}/interpret-stream`, {
@@ -186,10 +194,15 @@ const GenerateReport = () => {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(requestData),
       })
       .then(response => {
+        if (response.status === 401 || response.status === 403) {
+          clearSessionAndRedirect(navigate);
+          throw new Error('Сесията е изтекла. Моля влезте отново.');
+        }
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -388,8 +401,8 @@ const GenerateReport = () => {
       // Динамичен избор на URL:
       // - В production (hostname != localhost): използва Render.com API
       // - В development (localhost): използва локален сървър
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const API_BASE_URL = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:8000' : 'https://astromind-api.onrender.com');
+      const API_BASE_URL = getApiBaseUrl();
+      const token = localStorage.getItem('token');
 
       // Изпращане на заявка
       // Проверка дали е динамична прогноза - използваме streaming
@@ -399,6 +412,9 @@ const GenerateReport = () => {
       } else {
         // Standard request
         const response = await axios.post(`${API_BASE_URL}/interpret`, requestData, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           timeout: 90000  // 90 seconds timeout
         });
 
@@ -417,6 +433,12 @@ const GenerateReport = () => {
       }
     } catch (err) {
       console.error('Грешка:', err);
+
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        clearSessionAndRedirect(navigate);
+        return;
+      }
+
       // Извличане на съобщението за грешка, премахвайки префикси като "Неочаквана грешка: 400:"
       let errorMessage = err.response?.data?.detail || err.message || 'Възникна грешка при изчисляване на картата';
       
