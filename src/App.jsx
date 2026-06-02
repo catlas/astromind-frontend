@@ -3,6 +3,8 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import BuyCoins from './pages/BuyCoins';
 import GenerateReport from './pages/GenerateReport';
+import Profiles from './pages/Profiles';
+import History from './pages/History';
 
 function App() {
   return (
@@ -12,7 +14,8 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/buy-coins" element={<BuyCoins />} />
         <Route path="/generate-report" element={<GenerateReport />} />
-        {/* Тук по-късно ще добавим другите страници */}
+        <Route path="/profiles" element={<Profiles />} />
+        <Route path="/history" element={<History />} />
       </Routes>
     </Router>
   );

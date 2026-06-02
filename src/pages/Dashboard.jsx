@@ -59,11 +59,17 @@ const Dashboard = () => {
                 <span className="material-symbols-outlined">auto_awesome</span>
                 <span className="text-sm font-medium">Генерирай хороскоп</span>
               </button>
-          <button className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all">
+          <button 
+            onClick={() => navigate('/profiles')}
+            className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
+          >
             <span className="material-symbols-outlined">groups</span>
             <span className="text-sm font-medium">Профили</span>
           </button>
-          <button className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all">
+          <button 
+            onClick={() => navigate('/history')}
+            className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
+          >
             <span className="material-symbols-outlined">history</span>
             <span className="text-sm font-medium">История</span>
           </button>
@@ -134,14 +140,14 @@ const Dashboard = () => {
                 <span className="text-sm font-medium">Генерирай хороскоп</span>
               </button>
               <button 
-                onClick={() => setIsSidebarOpen(false)}
+                onClick={() => { navigate('/profiles'); setIsSidebarOpen(false); }}
                 className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
               >
                 <span className="material-symbols-outlined">groups</span>
                 <span className="text-sm font-medium">Профили</span>
               </button>
               <button 
-                onClick={() => setIsSidebarOpen(false)}
+                onClick={() => { navigate('/history'); setIsSidebarOpen(false); }}
                 className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
               >
                 <span className="material-symbols-outlined">history</span>
