@@ -7,6 +7,24 @@ export default function History() {
   const [user, setUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Mock history data
+  const [history] = useState([
+    { id: 1, type: 'career', label: 'Кариерна прогноза 2024', profile: 'Evgeni (Ти)', date: '2025-11-20', status: 'completed', coins: 2 },
+    { id: 2, type: 'synastry', label: 'Синастрия: Съвместимост', profile: 'Evgeni & Партньор', date: '2025-11-18', status: 'completed', coins: 3 },
+    { id: 3, type: 'natal', label: 'Дълбок анализ на натална карта', profile: 'Evgeni (Ти)', date: '2025-11-15', status: 'completed', coins: 1 },
+    { id: 4, type: 'daily', label: 'Дневен аспект — 14 ноември', profile: 'Evgeni (Ти)', date: '2025-11-14', status: 'completed', coins: 0 },
+    { id: 5, type: 'monthly', label: 'Месечен анализ — ноември', profile: 'Evgeni (Ти)', date: '2025-11-01', status: 'completed', coins: 2 },
+    { id: 6, type: 'question', label: 'Конкретен въпрос', profile: 'Evgeni (Ти)', date: '2025-10-28', status: 'completed', coins: 1 },
+    { id: 7, type: 'yearly', label: 'Годишен доклад 2025', profile: 'Evgeni (Ти)', date: '2025-01-15', status: 'completed', coins: 4 },
+    { id: 8, type: 'karmic', label: 'Кармичен анализ', profile: 'Партньор', date: '2025-09-10', status: 'completed', coins: 3 },
+    { id: 9, type: 'daily', label: 'Дневен аспект — 5 септември', profile: 'Evgeni (Ти)', date: '2025-09-05', status: 'pending', coins: 0 },
+    { id: 10, type: 'natal', label: 'Натална карта (Lite)', profile: 'Приятел', date: '2025-08-20', status: 'completed', coins: 0 },
+  ]);
+
+  const [filterType, setFilterType] = useState('all');
+  const [filterProfile, setFilterProfile] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
   useEffect(() => {
     let isMounted = true;
     const loadUser = async () => {
@@ -16,6 +34,34 @@ export default function History() {
     loadUser();
     return () => { isMounted = false; };
   }, [navigate]);
+
+  const typeIcons = {
+    natal: 'account_circle', daily: 'wb_sunny', question: 'help',
+    monthly: 'calendar_month', synastry: 'favorite', yearly: 'event',
+    career: 'work', karmic: 'auto_awesome'
+  };
+  const typeColors = {
+    natal: '#a78bfa', daily: '#fbbf24', question: '#f87171',
+    monthly: '#60a5fa', synastry: '#f472b6', yearly: '#34d399',
+    career: '#a3e635', karmic: '#c084fc'
+  };
+  const typeLabels = {
+    natal: 'Натална карта', daily: 'Дневен аспект', question: 'Конкретен въпрос',
+    monthly: 'Месечен анализ', synastry: 'Синастрия', yearly: 'Годишен доклад',
+    career: 'Кариерна прогноза', karmic: 'Кармичен анализ'
+  };
+
+  const filteredHistory = history.filter(item => {
+    if (filterType !== 'all' && item.type !== filterType) return false;
+    if (filterProfile !== 'all' && item.profile !== filterProfile) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!item.label.toLowerCase().includes(q) && !item.profile.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const profileOptions = ['all', ...new Set(history.map(h => h.profile))];
 
   if (!user) return null;
 
@@ -151,11 +197,104 @@ export default function History() {
             <p className="text-[#a69db9] text-base">Преглед на всички генерирани анализи и отчети</p>
           </div>
 
-          <div className="bg-[#201428] rounded-xl p-12 border border-[#302240] text-center">
-            <span className="material-symbols-outlined text-6xl text-[#6d6194] mb-4 block">history</span>
-            <h2 className="text-xl font-bold text-white mb-2">История — Coming soon</h2>
-            <p className="text-[#a69db9]">Тук ще виждаш всички свои астрологични анализи и отчети.</p>
+          {/* Filters */}
+          <div className="flex items-center gap-3 mb-6 flex-wrap">
+            <div className="flex-1 min-w-[200px] relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#6d6194]">search</span>
+              <input
+                type="text"
+                placeholder="Търсене по име или профил..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#201428] border border-[#302240] rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-[#6d6194] focus:outline-none focus:border-[#7c5dfa]"
+              />
+            </div>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="bg-[#201428] border border-[#302240] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#7c5dfa]"
+            >
+              <option value="all">Всички типове</option>
+              {Object.entries(typeLabels).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <select
+              value={filterProfile}
+              onChange={(e) => setFilterProfile(e.target.value)}
+              className="bg-[#201428] border border-[#302240] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#7c5dfa]"
+            >
+              {profileOptions.map(opt => (
+                <option key={opt} value={opt}>{opt === 'all' ? 'Всички профили' : opt}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => { setFilterType('all'); setFilterProfile('all'); setSearchQuery(''); }}
+              className="px-3 py-2 text-sm text-[#a69db9] hover:text-white transition-colors"
+            >
+              Изчисти
+            </button>
           </div>
+
+          {/* Table */}
+          <div className="bg-[#201428] rounded-xl border border-[#302240] overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#302240]">
+                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Тип отчет</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Профил</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Дата</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Монети</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-12 text-center text-[#a69db9]">
+                      <span className="material-symbols-outlined text-4xl mb-2 block">search_off</span>
+                      Няма намерени отчети
+                    </td>
+                  </tr>
+                ) : (
+                  filteredHistory.map((item) => (
+                    <tr key={item.id} className="border-b border-[#302240]/50 hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined" style={{ color: typeColors[item.type] || '#a69db9' }}>
+                            {typeIcons[item.type] || 'auto_awesome'}
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium">{item.label}</p>
+                            <p className="text-xs text-[#6d6194]">{typeLabels[item.type] || item.type}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{item.profile}</td>
+                      <td className="px-4 py-3 text-sm text-[#a69db9]">{item.date}</td>
+                      <td className="px-4 py-3 text-sm">{item.coins} {item.coins === 1 ? 'монета' : 'монети'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                          item.status === 'completed' ? 'bg-[#34d399]/20 text-[#34d399]' :
+                          item.status === 'pending' ? 'bg-[#fbbf24]/20 text-[#fbbf24]' :
+                          'bg-[#f87171]/20 text-[#f87171]'
+                        }`}>
+                          <span className="material-symbols-outlined text-xs">
+                            {item.status === 'completed' ? 'check_circle' : item.status === 'pending' ? 'pending' : 'error'}
+                          </span>
+                          {item.status === 'completed' ? 'Завършен' : item.status === 'pending' ? 'В процес' : 'Грешка'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-sm text-[#a69db9] mt-4">
+            Показвани {filteredHistory.length} от {history.length} отчета
+          </p>
         </div>
       </div>
     </div>
