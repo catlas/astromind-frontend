@@ -74,7 +74,7 @@ export default function History() {
     `flex items-center gap-3 px-3 py-3 rounded-lg transition-all ${
       isActive
         ? 'bg-[#5211d4] text-white shadow-lg shadow-[#5211d4]/25'
-        : 'text-[#a69db9] hover:bg-white/5'
+        : 'text-[#d4c8ed] hover:bg-white/5'
     }`;
 
   return (
@@ -92,7 +92,7 @@ export default function History() {
           </div>
           <div className="flex flex-col">
             <h1 className="text-lg font-bold leading-tight text-white">AstroMind</h1>
-            <p className="text-[#a69db9] text-xs font-medium">Cosmic Insights</p>
+            <p className="text-[#d4c8ed] text-xs font-medium">Cosmic Insights</p>
           </div>
         </div>
         <div className="flex flex-col gap-2 px-4 py-4 grow">
@@ -127,7 +127,7 @@ export default function History() {
             <div className="w-8 h-8 rounded-full bg-slate-700 border border-slate-700"></div>
             <div className="flex flex-col">
               <p className="text-sm font-medium text-white">{user.full_name || 'Потребител'}</p>
-              <p className="text-xs text-[#a69db9]">Безплатен план</p>
+              <p className="text-xs text-[#d4c8ed]">Безплатен план</p>
             </div>
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function History() {
                 </div>
                 <div className="flex flex-col">
                   <h1 className="text-lg font-bold leading-tight text-white">AstroMind</h1>
-                  <p className="text-[#a69db9] text-xs font-medium">Cosmic Insights</p>
+                  <p className="text-[#d4c8ed] text-xs font-medium">Cosmic Insights</p>
                 </div>
               </div>
               <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-white">
@@ -184,7 +184,7 @@ export default function History() {
                 <div className="w-8 h-8 rounded-full bg-slate-700 border border-slate-700"></div>
                 <div className="flex flex-col">
                   <p className="text-sm font-medium text-white">{user.full_name || 'Потребител'}</p>
-                  <p className="text-xs text-[#a69db9]">Безплатен план</p>
+                  <p className="text-xs text-[#d4c8ed]">Безплатен план</p>
                 </div>
               </div>
             </div>
@@ -199,36 +199,36 @@ export default function History() {
             <h1 className="text-3xl lg:text-[32px] font-bold leading-tight tracking-tight text-white mb-2">
               История на четенията
             </h1>
-            <p className="text-[#a69db9] text-base">Преглед на всички генерирани анализи и отчети</p>
+            <p className="text-[#d4c8ed] text-base">Преглед на всички генерирани анализи и отчети</p>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-[#201428] rounded-xl p-4 border border-[#302240]">
-              <div className="flex items-center gap-2 text-[#a69db9] mb-2">
+              <div className="flex items-center gap-2 text-[#d4c8ed] mb-2">
                 <span className="material-symbols-outlined">receipt_long</span>
                 <span className="text-xs">Всички отчети</span>
               </div>
-              <p className="text-2xl font-bold">{filteredHistory.length}</p>
+              <p className="text-2xl font-bold text-white">{filteredHistory.length}</p>
             </div>
             <div className="bg-[#201428] rounded-xl p-4 border border-[#302240]">
-              <div className="flex items-center gap-2 text-[#a69db9] mb-2">
+              <div className="flex items-center gap-2 text-[#d4c8ed] mb-2">
                 <span className="material-symbols-outlined">check_circle</span>
                 <span className="text-xs">Завършени</span>
               </div>
-              <p className="text-2xl font-bold">{filteredHistory.filter(h => h.status === 'completed').length}</p>
+              <p className="text-2xl font-bold text-white">{filteredHistory.filter(h => h.status === 'completed').length}</p>
             </div>
             <div className="bg-[#201428] rounded-xl p-4 border border-[#302240]">
-              <div className="flex items-center gap-2 text-[#a69db9] mb-2">
+              <div className="flex items-center gap-2 text-[#d4c8ed] mb-2">
                 <span className="material-symbols-outlined">token</span>
                 <span className="text-xs">Изразходвани монети</span>
               </div>
-              <p className="text-2xl font-bold">{filteredHistory.reduce((sum, h) => sum + h.coins, 0)}</p>
+              <p className="text-2xl font-bold text-white">{filteredHistory.reduce((sum, h) => sum + h.coins, 0)}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 mb-6 flex-wrap">
             <div className="flex-1 min-w-[200px] relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#6d6194]">search</span>
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#b8aed0]">search</span>
               <input
                 type="text"
                 placeholder="Търсене по име или профил..."
@@ -258,7 +258,7 @@ export default function History() {
             </select>
             <button
               onClick={() => { setFilterType('all'); setFilterProfile('all'); setSearchQuery(''); }}
-              className="px-3 py-2 text-sm text-[#a69db9] hover:text-white transition-colors"
+              className="px-3 py-2 text-sm text-[#d4c8ed] hover:text-white transition-colors"
             >
               Изчисти
             </button>
@@ -269,17 +269,17 @@ export default function History() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#302240]">
-                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Тип отчет</th>
-                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Профил</th>
-                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Дата</th>
-                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Монети</th>
-                  <th className="text-left px-4 py-3 text-xs text-[#a69db9] font-medium">Статус</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Тип отчет</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Профил</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Дата</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Монети</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Статус</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredHistory.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-4 py-12 text-center text-[#a69db9]">
+                    <td colSpan="5" className="px-4 py-12 text-center text-[#d4c8ed]">
                       <span className="material-symbols-outlined text-4xl mb-2 block">search_off</span>
                       Няма намерени отчети
                     </td>
@@ -294,12 +294,12 @@ export default function History() {
                           </span>
                           <div>
                             <p className="text-sm font-medium text-white">{item.label}</p>
-                            <p className="text-xs text-[#6d6194]">{typeLabels[item.type] || item.type}</p>
+                            <p className="text-xs text-[#b8aed0]">{typeLabels[item.type] || item.type}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-white">{item.profile}</td>
-                      <td className="px-4 py-3 text-sm text-[#a69db9]">{item.date}</td>
+                      <td className="px-4 py-3 text-sm text-[#d4c8ed]">{item.date}</td>
                       <td className="px-4 py-3 text-sm text-white">{item.coins} {item.coins === 1 ? 'монета' : 'монети'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
@@ -323,7 +323,7 @@ export default function History() {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-[#a69db9]">
+              <p className="text-sm text-[#d4c8ed]">
                 Показване {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredHistory.length)} от {filteredHistory.length} отчета
               </p>
               <div className="flex items-center gap-2">
@@ -341,7 +341,7 @@ export default function History() {
                     className={`w-8 h-8 rounded-lg text-sm transition-colors ${
                       currentPage === page
                         ? 'bg-[#7c5dfa] text-white'
-                        : 'bg-[#201428] border border-[#302240] text-[#a69db9] hover:bg-white/5'
+                        : 'bg-[#201428] border border-[#302240] text-[#d4c8ed] hover:bg-white/5'
                     }`}
                   >
                     {page}
