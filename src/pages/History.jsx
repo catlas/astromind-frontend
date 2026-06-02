@@ -2,24 +2,50 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
 
+// Load history from localStorage
+const loadHistory = () => {
+  try {
+    const raw = localStorage.getItem('astro_history');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+// Save history to localStorage
+const saveHistory = (items) => {
+  localStorage.setItem('astro_history', JSON.stringify(items));
+};
+
+// Initial demo data (only if no data exists)
+const getDemoData = () => [
+  { id: 1, type: 'career', label: 'Кариерна прогноза 2024', profile: 'Evgeni (Ти)', date: '2025-11-20', status: 'completed', coins: 2, content: 'Вашата кариера през 2024 е под влиянието на Сатурн в Риби...' },
+  { id: 2, type: 'synastry', label: 'Синастрия: Съвместимост', profile: 'Evgeni & Партньор', date: '2025-11-18', status: 'completed', coins: 3, content: 'Съвместимостта между двамата показва силна венера-марс връзка...' },
+  { id: 3, type: 'natal', label: 'Дълбок анализ на натална карта', profile: 'Evgeni (Ти)', date: '2025-11-15', status: 'completed', coins: 1, content: 'Вашата натална карта разкрива силен Скорпион Асцендент...' },
+  { id: 4, type: 'daily', label: 'Дневен аспект — 14 ноември', profile: 'Evgeni (Ти)', date: '2025-11-14', status: 'completed', coins: 0, content: 'Днес Луната във Водолей подкрепя иновациите...' },
+  { id: 5, type: 'monthly', label: 'Месечен анализ — ноември', profile: 'Evgeni (Ти)', date: '2025-11-01', status: 'completed', coins: 2, content: 'Ноември носи трансформация във вашата 10-та къща...' },
+  { id: 6, type: 'question', label: 'Конкретен въпрос', profile: 'Evgeni (Ти)', date: '2025-10-28', status: 'completed', coins: 1, content: 'Отговорът на вашия въпрос се крие в 7-мия дом...' },
+  { id: 7, type: 'yearly', label: 'Годишен доклад 2025', profile: 'Evgeni (Ти)', date: '2025-01-15', status: 'completed', coins: 4, content: '2025 е година на разширение с Юпитер в Близнаци...' },
+  { id: 8, type: 'karmic', label: 'Кармичен анализ', profile: 'Партньор', date: '2025-09-10', status: 'completed', coins: 3, content: 'Кармичният ви път е свързан с лечение и служба...' },
+  { id: 9, type: 'daily', label: 'Дневен аспект — 5 септември', profile: 'Evgeni (Ти)', date: '2025-09-05', status: 'pending', coins: 0, content: 'Предстои обработка...' },
+  { id: 10, type: 'natal', label: 'Натална карта (Lite)', profile: 'Приятел', date: '2025-08-20', status: 'completed', coins: 0, content: 'Основен анализ на натална карта...' },
+];
+
 export default function History() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [viewingItem, setViewingItem] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  // Mock history data
-  const [history] = useState([
-    { id: 1, type: 'career', label: 'Кариерна прогноза 2024', profile: 'Evgeni (Ти)', date: '2025-11-20', status: 'completed', coins: 2 },
-    { id: 2, type: 'synastry', label: 'Синастрия: Съвместимост', profile: 'Evgeni & Партньор', date: '2025-11-18', status: 'completed', coins: 3 },
-    { id: 3, type: 'natal', label: 'Дълбок анализ на натална карта', profile: 'Evgeni (Ти)', date: '2025-11-15', status: 'completed', coins: 1 },
-    { id: 4, type: 'daily', label: 'Дневен аспект — 14 ноември', profile: 'Evgeni (Ти)', date: '2025-11-14', status: 'completed', coins: 0 },
-    { id: 5, type: 'monthly', label: 'Месечен анализ — ноември', profile: 'Evgeni (Ти)', date: '2025-11-01', status: 'completed', coins: 2 },
-    { id: 6, type: 'question', label: 'Конкретен въпрос', profile: 'Evgeni (Ти)', date: '2025-10-28', status: 'completed', coins: 1 },
-    { id: 7, type: 'yearly', label: 'Годишен доклад 2025', profile: 'Evgeni (Ти)', date: '2025-01-15', status: 'completed', coins: 4 },
-    { id: 8, type: 'karmic', label: 'Кармичен анализ', profile: 'Партньор', date: '2025-09-10', status: 'completed', coins: 3 },
-    { id: 9, type: 'daily', label: 'Дневен аспект — 5 септември', profile: 'Evgeni (Ти)', date: '2025-09-05', status: 'pending', coins: 0 },
-    { id: 10, type: 'natal', label: 'Натална карта (Lite)', profile: 'Приятел', date: '2025-08-20', status: 'completed', coins: 0 },
-  ]);
+  // Load history from localStorage or demo data
+  const [history, setHistory] = useState(() => {
+    const existing = loadHistory();
+    if (existing.length > 0) return existing;
+    const demo = getDemoData();
+    saveHistory(demo);
+    return demo;
+  });
 
   const [filterType, setFilterType] = useState('all');
   const [filterProfile, setFilterProfile] = useState('all');
@@ -274,6 +300,7 @@ export default function History() {
                   <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Дата</th>
                   <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Монети</th>
                   <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Статус</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium w-24">Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -302,16 +329,36 @@ export default function History() {
                       <td className="px-4 py-3 text-sm text-[#d4c8ed]">{item.date}</td>
                       <td className="px-4 py-3 text-sm text-white">{item.coins} {item.coins === 1 ? 'монета' : 'монети'}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                          item.status === 'completed' ? 'bg-[#34d399]/20 text-[#34d399]' :
-                          item.status === 'pending' ? 'bg-[#fbbf24]/20 text-[#fbbf24]' :
-                          'bg-[#f87171]/20 text-[#f87171]'
-                        }`}>
-                          <span className="material-symbols-outlined text-xs">
-                            {item.status === 'completed' ? 'check_circle' : item.status === 'pending' ? 'pending' : 'error'}
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                            item.status === 'completed' ? 'bg-[#34d399]/20 text-[#34d399]' :
+                            item.status === 'pending' ? 'bg-[#fbbf24]/20 text-[#fbbf24]' :
+                            'bg-[#f87171]/20 text-[#f87171]'
+                          }`}>
+                            <span className="material-symbols-outlined text-xs">
+                              {item.status === 'completed' ? 'check_circle' : item.status === 'pending' ? 'pending' : 'error'}
+                            </span>
+                            {item.status === 'completed' ? 'Завършен' : item.status === 'pending' ? 'В процес' : 'Грешка'}
                           </span>
-                          {item.status === 'completed' ? 'Завършен' : item.status === 'pending' ? 'В процес' : 'Грешка'}
-                        </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setViewingItem(item)}
+                            className="p-1.5 rounded-lg text-[#d4c8ed] hover:text-white hover:bg-white/10 transition-colors"
+                            title="Преглед"
+                          >
+                            <span className="material-symbols-outlined text-lg">visibility</span>
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(item)}
+                            className="p-1.5 rounded-lg text-[#d4c8ed] hover:text-[#f87171] hover:bg-[#f87171]/10 transition-colors"
+                            title="Изтрий"
+                          >
+                            <span className="material-symbols-outlined text-lg">delete</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -359,6 +406,92 @@ export default function History() {
           )}
         </div>
       </div>
+
+      {/* View Report Modal */}
+      {viewingItem && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#201428] rounded-xl border border-[#302240] w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#302240] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined" style={{ color: typeColors[viewingItem.type] || '#d4c8ed' }}>
+                  {typeIcons[viewingItem.type] || 'auto_awesome'}
+                </span>
+                <div>
+                  <h3 className="text-lg font-bold text-white">{viewingItem.label}</h3>
+                  <p className="text-sm text-[#d4c8ed]">{viewingItem.date} • {viewingItem.profile}</p>
+                </div>
+              </div>
+              <button onClick={() => setViewingItem(null)} className="p-2 text-[#d4c8ed] hover:text-white">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="bg-[#161022] rounded-lg p-4 border border-[#302240]">
+                <p className="text-white leading-relaxed">{viewingItem.content || 'Няма съдържание'}</p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-[#302240] flex justify-end gap-3">
+              <button
+                onClick={() => setViewingItem(null)}
+                className="px-4 py-2 rounded-lg text-[#d4c8ed] hover:text-white transition-colors"
+              >
+                Затвори
+              </button>
+              <button
+                onClick={() => {
+                  const blob = new Blob([viewingItem.content || ''], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${viewingItem.label}.txt`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-4 py-2 rounded-lg bg-[#5211d4] text-white hover:bg-[#6b2ce0] transition-colors flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">download</span>
+                Изтегли
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#201428] rounded-xl border border-[#302240] w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="material-symbols-outlined text-[#f87171] text-3xl">warning</span>
+                <h3 className="text-lg font-bold text-white">Изтриване на отчет</h3>
+              </div>
+              <p className="text-[#d4c8ed] mb-6">
+                Сигурни ли сте, че искате да изтриете "{deleteConfirm.label}"? Това действие не може да бъде отменено.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="px-4 py-2 rounded-lg text-[#d4c8ed] hover:text-white transition-colors"
+                >
+                  Отказ
+                </button>
+                <button
+                  onClick={() => {
+                    const updated = history.filter(h => h.id !== deleteConfirm.id);
+                    setHistory(updated);
+                    saveHistory(updated);
+                    setDeleteConfirm(null);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-[#f87171] text-white hover:bg-[#ef4444] transition-colors"
+                >
+                  Изтрий
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
