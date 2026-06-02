@@ -260,7 +260,12 @@ const Dashboard = () => {
             <div className="lg:col-span-2 flex flex-col gap-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-white tracking-tight">Твоят кръг</h2>
-                <button className="text-sm text-[#5211d4] font-medium hover:text-[#5211d4]/80">Виж всички</button>
+                <button 
+                  onClick={() => navigate('/profiles')}
+                  className="text-sm text-[#5211d4] font-medium hover:text-[#5211d4]/80"
+                >
+                  Виж всички
+                </button>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -461,7 +466,12 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="flex justify-center mt-2">
-              <button className="text-sm text-slate-400 hover:text-[#5211d4] transition-colors">Виж пълна история</button>
+              <button 
+                onClick={() => navigate('/history')}
+                className="text-sm text-slate-400 hover:text-[#5211d4] transition-colors"
+              >
+                Виж пълна история
+              </button>
             </div>
           </div>
         </div>
