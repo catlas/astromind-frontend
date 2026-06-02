@@ -28,3 +28,4 @@ npm run dev
 Vite е конфигуриран с proxy към backend на `http://127.0.0.1:8000`. 
 Всички заявки към `/api/*` се пренасочват автоматично към backend сървъра.
 
+# trigger deploy
