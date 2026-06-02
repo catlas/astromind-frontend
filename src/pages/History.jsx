@@ -53,9 +53,6 @@ export default function History() {
     career: 'Кариерна прогноза', karmic: 'Кармичен анализ'
   };
 
-  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
-  const paginatedHistory = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
   const filteredHistory = history.filter(item => {
     if (filterType !== 'all' && item.type !== filterType) return false;
     if (filterProfile !== 'all' && item.profile !== filterProfile) return false;
@@ -65,6 +62,9 @@ export default function History() {
     }
     return true;
   });
+
+  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
+  const paginatedHistory = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const profileOptions = ['all', ...new Set(history.map(h => h.profile))];
 
