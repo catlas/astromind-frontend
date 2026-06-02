@@ -24,6 +24,8 @@ export default function History() {
   const [filterType, setFilterType] = useState('all');
   const [filterProfile, setFilterProfile] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
 
   useEffect(() => {
     let isMounted = true;
@@ -50,6 +52,9 @@ export default function History() {
     monthly: 'Месечен анализ', synastry: 'Синастрия', yearly: 'Годишен доклад',
     career: 'Кариерна прогноза', karmic: 'Кармичен анализ'
   };
+
+  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
+  const paginatedHistory = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const filteredHistory = history.filter(item => {
     if (filterType !== 'all' && item.type !== filterType) return false;
@@ -197,7 +202,30 @@ export default function History() {
             <p className="text-[#a69db9] text-base">Преглед на всички генерирани анализи и отчети</p>
           </div>
 
-          {/* Filters */}
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-[#201428] rounded-xl p-4 border border-[#302240]">
+              <div className="flex items-center gap-2 text-[#a69db9] mb-2">
+                <span className="material-symbols-outlined">receipt_long</span>
+                <span className="text-xs">Всички отчети</span>
+              </div>
+              <p className="text-2xl font-bold">{filteredHistory.length}</p>
+            </div>
+            <div className="bg-[#201428] rounded-xl p-4 border border-[#302240]">
+              <div className="flex items-center gap-2 text-[#a69db9] mb-2">
+                <span className="material-symbols-outlined">check_circle</span>
+                <span className="text-xs">Завършени</span>
+              </div>
+              <p className="text-2xl font-bold">{filteredHistory.filter(h => h.status === 'completed').length}</p>
+            </div>
+            <div className="bg-[#201428] rounded-xl p-4 border border-[#302240]">
+              <div className="flex items-center gap-2 text-[#a69db9] mb-2">
+                <span className="material-symbols-outlined">token</span>
+                <span className="text-xs">Изразходвани монети</span>
+              </div>
+              <p className="text-2xl font-bold">{filteredHistory.reduce((sum, h) => sum + h.coins, 0)}</p>
+            </div>
+          </div>
           <div className="flex items-center gap-3 mb-6 flex-wrap">
             <div className="flex-1 min-w-[200px] relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#6d6194]">search</span>
@@ -257,7 +285,7 @@ export default function History() {
                     </td>
                   </tr>
                 ) : (
-                  filteredHistory.map((item) => (
+                  paginatedHistory.map((item) => (
                     <tr key={item.id} className="border-b border-[#302240]/50 hover:bg-white/[0.02] transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -292,9 +320,43 @@ export default function History() {
             </table>
           </div>
 
-          <p className="text-sm text-[#a69db9] mt-4">
-            Показвани {filteredHistory.length} от {history.length} отчета
-          </p>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-[#a69db9]">
+                Показване {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredHistory.length)} от {filteredHistory.length} отчета
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg bg-[#201428] border border-[#302240] disabled:opacity-30 hover:bg-white/5 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm">chevron_left</span>
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-8 h-8 rounded-lg text-sm transition-colors ${
+                      currentPage === page
+                        ? 'bg-[#7c5dfa] text-white'
+                        : 'bg-[#201428] border border-[#302240] text-[#a69db9] hover:bg-white/5'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg bg-[#201428] border border-[#302240] disabled:opacity-30 hover:bg-white/5 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm">chevron_right</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
