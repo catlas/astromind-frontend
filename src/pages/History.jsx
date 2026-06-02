@@ -293,14 +293,14 @@ export default function History() {
                             {typeIcons[item.type] || 'auto_awesome'}
                           </span>
                           <div>
-                            <p className="text-sm font-medium">{item.label}</p>
+                            <p className="text-sm font-medium text-white">{item.label}</p>
                             <p className="text-xs text-[#6d6194]">{typeLabels[item.type] || item.type}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm">{item.profile}</td>
+                      <td className="px-4 py-3 text-sm text-white">{item.profile}</td>
                       <td className="px-4 py-3 text-sm text-[#a69db9]">{item.date}</td>
-                      <td className="px-4 py-3 text-sm">{item.coins} {item.coins === 1 ? 'монета' : 'монети'}</td>
+                      <td className="px-4 py-3 text-sm text-white">{item.coins} {item.coins === 1 ? 'монета' : 'монети'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
                           item.status === 'completed' ? 'bg-[#34d399]/20 text-[#34d399]' :
