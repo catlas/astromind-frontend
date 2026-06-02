@@ -90,8 +90,74 @@ const Profiles = () => {
       if (isMounted && sessionUser) setUser(sessionUser);
     };
     loadUser();
+    loadProfilesFromStorage();
     return () => { isMounted = false; };
   }, [navigate]);
+
+  // Зареждане на профили от localStorage
+  const loadProfilesFromStorage = () => {
+    try {
+      const items = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('astro_profile_')) {
+          const data = JSON.parse(localStorage.getItem(key));
+          const name = key.replace('astro_profile_', '');
+          items.push({
+            id: key,
+            name: name,
+            relation: data.partnerData ? 'partner' : 'self',
+            relationLabel: data.partnerData ? 'Партньор' : 'Аз',
+            gender: 'other',
+            birth_date: data.date || '',
+            birth_time: data.time || '',
+            unknown_time: !data.time,
+            birth_place: data.selectedCity || '',
+            lat: data.lat || '',
+            lon: data.lon || '',
+            is_primary: items.length === 0,
+          });
+        }
+      }
+      if (items.length === 0) {
+        setProfiles(mockProfiles);
+      } else {
+        setProfiles(items);
+      }
+    } catch (err) {
+      console.error('Грешка при зареждане на профили:', err);
+      setProfiles(mockProfiles);
+    }
+  };
+
+  // Запазване на профил в localStorage
+  const saveProfileToStorage = (profileData) => {
+    try {
+      const key = `astro_profile_${profileData.name}`;
+      const existing = JSON.parse(localStorage.getItem(key) || '{}');
+      const data = {
+        ...existing,
+        date: profileData.birth_date,
+        time: profileData.unknown_time ? '' : profileData.birth_time,
+        lat: profileData.lat,
+        lon: profileData.lon,
+        selectedCity: profileData.birth_place,
+      };
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (err) {
+      console.error('Грешка при запазване на профил:', err);
+    }
+  };
+
+  // Изтриване на профил от localStorage
+  const deleteProfileFromStorage = (profileName) => {
+    try {
+      const key = `astro_profile_${profileName}`;
+      localStorage.removeItem(key);
+    } catch (err) {
+      console.error('Грешка при изтриване на профил:', err);
+    }
+  };
 
   const handleLogout = () => {
     clearSessionAndRedirect(navigate);
@@ -113,6 +179,10 @@ const Profiles = () => {
   };
 
   const handleDelete = (id) => {
+    const profile = profiles.find(p => p.id === id);
+    if (profile) {
+      deleteProfileFromStorage(profile.name);
+    }
     setProfiles(profiles.filter((p) => p.id !== id));
     if (editingId === id) {
       setEditingId(null);
@@ -139,6 +209,10 @@ const Profiles = () => {
     const relationLabel = relationOptions.find((r) => r.value === form.relation)?.label || '';
 
     if (editingId) {
+      const oldProfile = profiles.find(p => p.id === editingId);
+      if (oldProfile && oldProfile.name !== form.name) {
+        deleteProfileFromStorage(oldProfile.name);
+      }
       setProfiles(
         profiles.map((p) =>
           p.id === editingId
@@ -148,13 +222,15 @@ const Profiles = () => {
       );
     } else {
       const newProfile = {
-        id: Date.now(),
+        id: `astro_profile_${form.name}`,
         ...form,
         relationLabel,
-        is_primary: false,
+        is_primary: profiles.length === 0,
       };
       setProfiles([...profiles, newProfile]);
     }
+    
+    saveProfileToStorage(form);
     resetForm();
   };
 
