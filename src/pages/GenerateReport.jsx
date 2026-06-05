@@ -188,6 +188,10 @@ const GenerateReport = () => {
   const handleDynamicForecastStreaming = async (API_BASE_URL, requestData) => {
     const token = localStorage.getItem('token');
     return new Promise((resolve, reject) => {
+      // AbortController with 5-minute timeout for Ollama
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min
+      
       // Use fetch with ReadableStream for POST requests with SSE
       fetch(`${API_BASE_URL}/interpret-stream`, {
         method: 'POST',
@@ -197,6 +201,7 @@ const GenerateReport = () => {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(requestData),
+        signal: controller.signal,
       })
       .then(response => {
         if (response.status === 401 || response.status === 403) {
@@ -282,11 +287,13 @@ const GenerateReport = () => {
               
             case 'complete':
               setLoadingMessage('');
+              clearTimeout(timeoutId);
               resolve();
               break;
               
             case 'error':
               hasError = true;
+              clearTimeout(timeoutId);
               setError(data.message || 'Грешка при генериране на прогноза');
               reject(new Error(data.message));
               break;
@@ -317,6 +324,7 @@ const GenerateReport = () => {
         pump();
       })
       .catch(error => {
+        clearTimeout(timeoutId);
         console.error('Fetch error:', error);
         setError('Грешка при свързване със сървъра');
         reject(error);
