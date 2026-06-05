@@ -415,7 +415,7 @@ const GenerateReport = () => {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          timeout: 90000  // 90 seconds timeout
+          timeout: 300000  // 300 seconds timeout (5 min) for Ollama
         });
 
         setResult(response.data);
