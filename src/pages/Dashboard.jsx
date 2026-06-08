@@ -6,6 +6,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -87,14 +89,62 @@ const Dashboard = () => {
           </button>
         </div>
         
-        <div className="p-4 border-t border-slate-800">
-          <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer">
-            <div className="w-8 h-8 rounded-full bg-slate-700 border border-slate-700"></div>
-            <div className="flex flex-col">
-              <p className="text-sm font-medium text-white">{user.full_name || 'Потребител'}</p>
-              <p className="text-xs text-[#a69db9]">Безплатен план</p>
+        <div className="p-4 border-t border-slate-800 relative">
+          {logoutConfirm && (
+            <div className="absolute bottom-full left-3 right-3 mb-2 bg-[#1f1c27] border border-slate-700 rounded-2xl p-4 shadow-2xl z-50">
+              <p className="text-sm font-semibold text-white mb-1">Изход от акаунта?</p>
+              <p className="text-xs text-[#a69db9] mb-3">Ще бъдеш пренасочен към началната страница.</p>
+              <div className="flex gap-2">
+                <button onClick={() => clearSessionAndRedirect(navigate)} className="flex-1 py-2 bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-xs font-bold rounded-xl transition-all">Да, изход</button>
+                <button onClick={() => { setLogoutConfirm(false); setUserMenuOpen(false); }} className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-slate-400 text-xs rounded-xl transition-all">Отказ</button>
+              </div>
             </div>
-          </div>
+          )}
+          {userMenuOpen && !logoutConfirm && (
+            <div className="absolute bottom-full left-3 right-3 mb-2 bg-[#1f1c27] border border-slate-700 rounded-2xl overflow-hidden shadow-2xl z-50">
+              <div className="px-4 py-3 bg-[#5211d4]/10 border-b border-slate-700/50">
+                <p className="text-xs text-[#a69db9]">Влязъл като</p>
+                <p className="text-sm font-semibold text-white truncate">{user.email}</p>
+              </div>
+              <div className="p-2">
+                <button onClick={() => { navigate('/settings'); setUserMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
+                  <span className="material-symbols-outlined text-[#5211d4]" style={{ fontSize: '18px' }}>manage_accounts</span>
+                  Редактирай профила
+                </button>
+                <button onClick={() => { navigate('/buy-coins'); setUserMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
+                  <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '18px' }}>token</span>
+                  {user.coins || 0} монети в баланса
+                </button>
+                <div className="h-px bg-slate-800 my-1" />
+                <button onClick={() => setLogoutConfirm(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all text-left">
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
+                  Изход
+                </button>
+              </div>
+            </div>
+          )}
+          <button className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all group" onClick={() => { setUserMenuOpen(o => !o); setLogoutConfirm(false); }}>
+            <div className="relative flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#5211d4] to-[#7c3aed] flex items-center justify-center shadow-lg shadow-[#5211d4]/30">
+                <span className="text-xs font-bold text-white">{user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) : '?'}</span>
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#131118] flex items-center justify-center">
+                <div className="w-3 h-3 rounded-full bg-yellow-400 flex items-center justify-center">
+                  <span className="text-[6px] font-black text-yellow-900">✦</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col flex-1 min-w-0 text-left">
+              <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
+              <div className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '11px' }}>token</span>
+                <span className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</span>
+                <span className="text-[#a69db9] text-[10px] mx-1">·</span>
+                <span className="text-[11px] text-[#a69db9]">Безплатен</span>
+              </div>
+            </div>
+            <span className={`material-symbols-outlined text-slate-500 group-hover:text-slate-300 transition-all ${userMenuOpen ? 'rotate-180' : ''}`} style={{ fontSize: '18px' }}>expand_less</span>
+          </button>
         </div>
       </div>
 
@@ -170,14 +220,62 @@ const Dashboard = () => {
               </button>
             </div>
             
-            <div className="p-4 border-t border-slate-800">
-              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer">
-                <div className="w-8 h-8 rounded-full bg-slate-700 border border-slate-700"></div>
-                <div className="flex flex-col">
-                  <p className="text-sm font-medium text-white">{user.full_name || 'Потребител'}</p>
-                  <p className="text-xs text-[#a69db9]">Безплатен план</p>
+            <div className="p-4 border-t border-slate-800 relative">
+              {logoutConfirm && (
+                <div className="absolute bottom-full left-3 right-3 mb-2 bg-[#1f1c27] border border-slate-700 rounded-2xl p-4 shadow-2xl z-50">
+                  <p className="text-sm font-semibold text-white mb-1">Изход от акаунта?</p>
+                  <p className="text-xs text-[#a69db9] mb-3">Ще бъдеш пренасочен към началната страница.</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => clearSessionAndRedirect(navigate)} className="flex-1 py-2 bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-xs font-bold rounded-xl transition-all">Да, изход</button>
+                    <button onClick={() => { setLogoutConfirm(false); setUserMenuOpen(false); }} className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-slate-400 text-xs rounded-xl transition-all">Отказ</button>
+                  </div>
                 </div>
-              </div>
+              )}
+              {userMenuOpen && !logoutConfirm && (
+                <div className="absolute bottom-full left-3 right-3 mb-2 bg-[#1f1c27] border border-slate-700 rounded-2xl overflow-hidden shadow-2xl z-50">
+                  <div className="px-4 py-3 bg-[#5211d4]/10 border-b border-slate-700/50">
+                    <p className="text-xs text-[#a69db9]">Влязъл като</p>
+                    <p className="text-sm font-semibold text-white truncate">{user.email}</p>
+                  </div>
+                  <div className="p-2">
+                    <button onClick={() => { navigate('/settings'); setUserMenuOpen(false); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
+                      <span className="material-symbols-outlined text-[#5211d4]" style={{ fontSize: '18px' }}>manage_accounts</span>
+                      Редактирай профила
+                    </button>
+                    <button onClick={() => { navigate('/buy-coins'); setUserMenuOpen(false); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
+                      <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '18px' }}>token</span>
+                      {user.coins || 0} монети в баланса
+                    </button>
+                    <div className="h-px bg-slate-800 my-1" />
+                    <button onClick={() => setLogoutConfirm(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all text-left">
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
+                      Изход
+                    </button>
+                  </div>
+                </div>
+              )}
+              <button className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all group" onClick={() => { setUserMenuOpen(o => !o); setLogoutConfirm(false); }}>
+                <div className="relative flex-shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#5211d4] to-[#7c3aed] flex items-center justify-center shadow-lg shadow-[#5211d4]/30">
+                    <span className="text-xs font-bold text-white">{user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) : '?'}</span>
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#131118] flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-yellow-400 flex items-center justify-center">
+                      <span className="text-[6px] font-black text-yellow-900">✦</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col flex-1 min-w-0 text-left">
+                  <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
+                  <div className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '11px' }}>token</span>
+                    <span className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</span>
+                    <span className="text-[#a69db9] text-[10px] mx-1">·</span>
+                    <span className="text-[11px] text-[#a69db9]">Безплатен</span>
+                  </div>
+                </div>
+                <span className={`material-symbols-outlined text-slate-500 group-hover:text-slate-300 transition-all ${userMenuOpen ? 'rotate-180' : ''}`} style={{ fontSize: '18px' }}>expand_less</span>
+              </button>
             </div>
           </div>
         </>
