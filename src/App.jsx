@@ -5,6 +5,7 @@ import BuyCoins from './pages/BuyCoins';
 import GenerateReport from './pages/GenerateReport';
 import Profiles from './pages/Profiles';
 import History from './pages/History';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/generate-report" element={<GenerateReport />} />
         <Route path="/profiles" element={<Profiles />} />
         <Route path="/history" element={<History />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Router>
   );

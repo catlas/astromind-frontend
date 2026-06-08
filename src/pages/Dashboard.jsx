@@ -74,7 +74,7 @@ const Dashboard = () => {
             <span className="text-sm font-medium">История</span>
           </button>
           <div className="h-px bg-slate-800 my-2"></div>
-          <button className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all">
+          <button onClick={() => navigate('/settings')} className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all">
             <span className="material-symbols-outlined">settings</span>
             <span className="text-sm font-medium">Настройки</span>
           </button>
@@ -155,7 +155,7 @@ const Dashboard = () => {
               </button>
               <div className="h-px bg-slate-800 my-2"></div>
               <button 
-                onClick={() => setIsSidebarOpen(false)}
+                onClick={() => { navigate('/settings'); setIsSidebarOpen(false); }}
                 className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
               >
                 <span className="material-symbols-outlined">settings</span>

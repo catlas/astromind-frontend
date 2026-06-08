@@ -139,7 +139,7 @@ export default function History() {
             <span className="text-sm font-medium">История</span>
           </button>
           <div className="h-px bg-slate-800 my-2"></div>
-          <button className={sidebarButtonClass(false)}>
+          <button onClick={() => navigate('/settings')} className={sidebarButtonClass(false)}>
             <span className="material-symbols-outlined">settings</span>
             <span className="text-sm font-medium">Настройки</span>
           </button>
@@ -196,7 +196,7 @@ export default function History() {
                 <span className="text-sm font-medium">История</span>
               </button>
               <div className="h-px bg-slate-800 my-2"></div>
-              <button className={sidebarButtonClass(false)}>
+              <button onClick={() => { navigate('/settings'); setIsSidebarOpen(false); }} className={sidebarButtonClass(false)}>
                 <span className="material-symbols-outlined">settings</span>
                 <span className="text-sm font-medium">Настройки</span>
               </button>
