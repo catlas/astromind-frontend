@@ -344,7 +344,7 @@ export default function Settings() {
         >
           {/* Avatar with coin ring */}
           <div className="relative flex-shrink-0">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#5211d4] to-[#7c3aed] flex items-center justify-center shadow-lg shadow-[#5211d4]/30">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#7c3aed] to-[#a855f7] flex items-center justify-center shadow-lg shadow-[#7c3aed]/40">
               <span className="text-xs font-bold text-white">{getInitials(user.full_name)}</span>
             </div>
             <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#131118] flex items-center justify-center">
