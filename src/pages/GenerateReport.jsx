@@ -7,6 +7,7 @@ import DownloadPDFButton from '../components/DownloadPDFButton';
 import ChartSummary from '../components/ChartSummary';
 import { bulgarianCities } from '../utils/bulgarianCities';
 import { clearSessionAndRedirect, getApiBaseUrl, verifySession } from '../utils/auth';
+import DOMPurify from 'dompurify';
 
 const GenerateReport = () => {
   const navigate = useNavigate();
@@ -1147,12 +1148,13 @@ const GenerateReport = () => {
               <div className="prose prose-invert max-w-none">
                 <div 
                   className="text-gray-200 leading-relaxed whitespace-pre-wrap"
-                  dangerouslySetInnerHTML={{ 
-                    __html: result.interpretation
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(result.interpretation
                       .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold text-purple-400 mt-6 mb-3">$1</h2>')
                       .replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold text-purple-300 mt-4 mb-2">$1</h3>')
                       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                      .replace(/\n/g, '<br />') 
+                      .replace(/\n/g, '<br />')
+                    )
                   }}
                 />
               </div>
