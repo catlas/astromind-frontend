@@ -7,7 +7,7 @@ import DownloadPDFButton from '../components/DownloadPDFButton';
 import ChartSummary from '../components/ChartSummary';
 import { bulgarianCities } from '../utils/bulgarianCities';
 import { clearSessionAndRedirect, getApiBaseUrl, verifySession } from '../utils/auth';
-import { fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
+import { api, fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
 import DOMPurify from 'dompurify';
 
 const GenerateReport = () => {
@@ -51,6 +51,17 @@ const GenerateReport = () => {
   const [error, setError] = useState(null);
   const [monthlyResults, setMonthlyResults] = useState([]); // For chunked PDF generation
   const [savedProfiles, setSavedProfiles] = useState([]);
+  const [billingConfig, setBillingConfig] = useState(null);
+
+  const updateBalance = (balance) => {
+    if (balance === null || balance === undefined) return;
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, coins: balance };
+      localStorage.setItem('user', JSON.stringify(next));
+      return next;
+    });
+  };
 
   const refreshSavedProfiles = async () => {
     try {
@@ -69,6 +80,7 @@ const GenerateReport = () => {
       if (isMounted && sessionUser) {
         setUser(sessionUser);
         refreshSavedProfiles();
+        api.get('/billing/config').then((r) => setBillingConfig(r.data)).catch(() => {});
       }
     };
 
@@ -308,6 +320,7 @@ const GenerateReport = () => {
               break;
               
             case 'complete':
+              updateBalance(data.balance);
               setLoadingMessage('');
               clearTimeout(timeoutId);
               resolve();
@@ -449,6 +462,7 @@ const GenerateReport = () => {
         });
 
         setResult(response.data);
+        updateBalance(response.data.balance);
       }
       
       // Запазване на профила на сървъра
@@ -1033,6 +1047,29 @@ const GenerateReport = () => {
                   </div>
                 </div>
 
+                {billingConfig?.coins_enforced && (() => {
+                  const c = billingConfig.costs || {};
+                  let cost;
+                  if (isDynamic) {
+                    const start = new Date(transitData.target_date || `${new Date().getFullYear()}-01-01`);
+                    const end = endDate ? new Date(endDate) : start;
+                    const months = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1);
+                    cost = months * (c.forecast_month || 0);
+                  } else {
+                    cost = c.analysis || 0;
+                  }
+                  if (enablePartner) cost += c.partner_extra || 0;
+                  const enough = (user?.coins ?? 0) >= cost;
+                  return (
+                    <p className={`text-sm text-center ${enough ? 'text-gray-300' : 'text-red-300'}`}>
+                      Цена: <b>{cost}</b> {isDynamic ? '(прибл.) ' : ''}монети · Баланс: <b>{user?.coins ?? 0}</b>
+                      {!enough && (
+                        <button type="button" onClick={() => navigate('/buy-coins')} className="ml-2 underline text-purple-300">Купи монети</button>
+                      )}
+                    </p>
+                  );
+                })()}
+
                 <button
                   type="submit"
                   disabled={loading}
@@ -1086,6 +1123,11 @@ const GenerateReport = () => {
             {error && (
               <div className="bg-red-900/50 border border-red-500/50 rounded-lg p-4">
                 <p className="text-red-200">{error}</p>
+                {String(error).includes('монети') && (
+                  <button onClick={() => navigate('/buy-coins')} className="mt-3 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold">
+                    Купи монети
+                  </button>
+                )}
               </div>
             )}
 
