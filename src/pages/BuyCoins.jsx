@@ -24,9 +24,9 @@ const BuyCoins = () => {
   }, [navigate]);
 
   const pricingTiers = [
-    { name: 'Начинаещ', coins: 50, price: '9.99', description: 'Перфектен за 5-6 детайлни анализа', icon: 'star' },
-    { name: 'Популярен', coins: 150, price: '24.99', description: 'Най-добрата стойност за редовни потребители', icon: 'auto_awesome', recommended: true },
-    { name: 'Експерт', coins: 500, price: '69.99', description: 'За професионалисти и сериозни изследователи', icon: 'workspace_premium' }
+    { name: 'Начинаещ', coins: 50, price: '4,99', description: 'Перфектен за 5-6 детайлни анализа', icon: 'star' },
+    { name: 'Популярен', coins: 150, price: '12,99', description: 'Най-добрата стойност за редовни потребители', icon: 'auto_awesome', recommended: true },
+    { name: 'Експерт', coins: 500, price: '35,99', description: 'За професионалисти и сериозни изследователи', icon: 'workspace_premium' }
   ];
 
   if (!user) return null;
@@ -70,7 +70,7 @@ const BuyCoins = () => {
               </div>
 
               <div className="mb-6">
-                <span className="text-4xl font-extrabold">{tier.price} лв.</span>
+                <span className="text-4xl font-extrabold">{tier.price} €</span>
                 <p className="text-slate-400 text-sm mt-2">{tier.description}</p>
               </div>
 

@@ -17,58 +17,13 @@ const genderOptions = [
   { value: 'other', label: 'Друг' },
 ];
 
-const mockProfiles = [
-  {
-    id: 1,
-    name: 'NE',
-    relation: 'self',
-    relationLabel: 'Аз',
-    gender: 'female',
-    birth_date: '1994-04-20',
-    birth_time: '12:30',
-    unknown_time: false,
-    birth_place: 'София',
-    lat: 42.6977,
-    lon: 23.3219,
-    is_primary: true,
-  },
-  {
-    id: 2,
-    name: 'MI',
-    relation: 'partner',
-    relationLabel: 'Партньор',
-    gender: 'male',
-    birth_date: '1990-08-15',
-    birth_time: '08:00',
-    unknown_time: false,
-    birth_place: 'Пловдив',
-    lat: 42.1354,
-    lon: 24.7453,
-    is_primary: false,
-  },
-  {
-    id: 3,
-    name: 'GP',
-    relation: 'friend',
-    relationLabel: 'Приятел',
-    gender: 'other',
-    birth_date: '1992-11-03',
-    birth_time: null,
-    unknown_time: true,
-    birth_place: 'Варна',
-    lat: 43.2141,
-    lon: 27.9147,
-    is_primary: false,
-  },
-];
-
 const Profiles = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
-  const [profiles, setProfiles] = useState(mockProfiles);
+  const [profiles, setProfiles] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
 
@@ -122,13 +77,13 @@ const Profiles = () => {
         }
       }
       if (items.length === 0) {
-        setProfiles(mockProfiles);
+        setProfiles([]);
       } else {
         setProfiles(items);
       }
     } catch (err) {
       console.error('Грешка при зареждане на профили:', err);
-      setProfiles(mockProfiles);
+      setProfiles([]);
     }
   };
 
@@ -517,6 +472,16 @@ const Profiles = () => {
                   Нов профил
                 </button>
               </div>
+
+              {profiles.length === 0 && (
+                <div className="p-8 rounded-xl bg-[#1f1c27] border border-dashed border-slate-700 text-center">
+                  <span className="material-symbols-outlined text-[#a69db9] text-4xl mb-2">person_add</span>
+                  <p className="text-white font-semibold mb-1">Още нямате запазени профили</p>
+                  <p className="text-sm text-[#a69db9]">
+                    Добавете профил с формата за нов профил или запазете данните си при нов анализ.
+                  </p>
+                </div>
+              )}
 
               {profiles.map((profile) => (
                 <div

@@ -17,19 +17,22 @@ const saveHistory = (items) => {
   localStorage.setItem('astro_history', JSON.stringify(items));
 };
 
-// Initial demo data (only if no data exists)
-const getDemoData = () => [
-  { id: 1, type: 'career', label: 'Кариерна прогноза 2024', profile: 'Evgeni (Ти)', date: '2025-11-20', status: 'completed', coins: 2, content: 'Вашата кариера през 2024 е под влиянието на Сатурн в Риби...' },
-  { id: 2, type: 'synastry', label: 'Синастрия: Съвместимост', profile: 'Evgeni & Партньор', date: '2025-11-18', status: 'completed', coins: 3, content: 'Съвместимостта между двамата показва силна венера-марс връзка...' },
-  { id: 3, type: 'natal', label: 'Дълбок анализ на натална карта', profile: 'Evgeni (Ти)', date: '2025-11-15', status: 'completed', coins: 1, content: 'Вашата натална карта разкрива силен Скорпион Асцендент...' },
-  { id: 4, type: 'daily', label: 'Дневен аспект — 14 ноември', profile: 'Evgeni (Ти)', date: '2025-11-14', status: 'completed', coins: 0, content: 'Днес Луната във Водолей подкрепя иновациите...' },
-  { id: 5, type: 'monthly', label: 'Месечен анализ — ноември', profile: 'Evgeni (Ти)', date: '2025-11-01', status: 'completed', coins: 2, content: 'Ноември носи трансформация във вашата 10-та къща...' },
-  { id: 6, type: 'question', label: 'Конкретен въпрос', profile: 'Evgeni (Ти)', date: '2025-10-28', status: 'completed', coins: 1, content: 'Отговорът на вашия въпрос се крие в 7-мия дом...' },
-  { id: 7, type: 'yearly', label: 'Годишен доклад 2025', profile: 'Evgeni (Ти)', date: '2025-01-15', status: 'completed', coins: 4, content: '2025 е година на разширение с Юпитер в Близнаци...' },
-  { id: 8, type: 'karmic', label: 'Кармичен анализ', profile: 'Партньор', date: '2025-09-10', status: 'completed', coins: 3, content: 'Кармичният ви път е свързан с лечение и служба...' },
-  { id: 9, type: 'daily', label: 'Дневен аспект — 5 септември', profile: 'Evgeni (Ти)', date: '2025-09-05', status: 'pending', coins: 0, content: 'Предстои обработка...' },
-  { id: 10, type: 'natal', label: 'Натална карта (Lite)', profile: 'Приятел', date: '2025-08-20', status: 'completed', coins: 0, content: 'Основен анализ на натална карта...' },
-];
+// По-рано страницата записваше 10 демо отчета в браузъра на всеки нов потребител.
+// Тези записи се разпознават по съдържанието си и се премахват при зареждане.
+const LEGACY_DEMO_CONTENT = new Set([
+  'Вашата кариера през 2024 е под влиянието на Сатурн в Риби...',
+  'Съвместимостта между двамата показва силна венера-марс връзка...',
+  'Вашата натална карта разкрива силен Скорпион Асцендент...',
+  'Днес Луната във Водолей подкрепя иновациите...',
+  'Ноември носи трансформация във вашата 10-та къща...',
+  'Отговорът на вашия въпрос се крие в 7-мия дом...',
+  '2025 е година на разширение с Юпитер в Близнаци...',
+  'Кармичният ви път е свързан с лечение и служба...',
+  'Предстои обработка...',
+  'Основен анализ на натална карта...',
+]);
+
+const removeLegacyDemo = (items) => items.filter((item) => !LEGACY_DEMO_CONTENT.has(item.content));
 
 export default function History() {
   const navigate = useNavigate();
@@ -40,13 +43,12 @@ export default function History() {
   const [viewingItem, setViewingItem] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  // Load history from localStorage or demo data
+  // Load history from localStorage (без демо данни)
   const [history, setHistory] = useState(() => {
     const existing = loadHistory();
-    if (existing.length > 0) return existing;
-    const demo = getDemoData();
-    saveHistory(demo);
-    return demo;
+    const cleaned = removeLegacyDemo(existing);
+    if (cleaned.length !== existing.length) saveHistory(cleaned);
+    return cleaned;
   });
 
   const [filterType, setFilterType] = useState('all');
@@ -405,8 +407,8 @@ export default function History() {
                 {filteredHistory.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-4 py-12 text-center text-[#d4c8ed]">
-                      <span className="material-symbols-outlined text-4xl mb-2 block">search_off</span>
-                      Няма намерени отчети
+                      <span className="material-symbols-outlined text-4xl mb-2 block">{history.length === 0 ? 'history' : 'search_off'}</span>
+                      {history.length === 0 ? 'Още нямате запазени отчети' : 'Няма намерени отчети'}
                     </td>
                   </tr>
                 ) : (

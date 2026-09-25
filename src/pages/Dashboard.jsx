@@ -325,9 +325,9 @@ const Dashboard = () => {
                     <span className="material-symbols-outlined text-[#5211d4]">token</span>
                     <p className="text-[#a69db9] text-sm font-medium uppercase tracking-wider">Баланс</p>
                   </div>
-                  <p className="text-4xl font-bold text-white tracking-tight mb-2">{user.coins || 10} AstroМонети</p>
+                  <p className="text-4xl font-bold text-white tracking-tight mb-2">{user.coins ?? 0} AstroМонети</p>
                   <p className="text-[#a69db9] text-base">
-                    Имаш достатъчно баланс за <span className="text-[#5211d4] font-bold">4 подробни четения</span> или 2 отчета за синастрия.
+                    Монетите се използват за подробни анализи и синастрия.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -337,9 +337,6 @@ const Dashboard = () => {
                   >
                     <span className="material-symbols-outlined text-lg">auto_awesome</span>
                     Генерирай хороскоп
-                  </button>
-                  <button className="flex cursor-pointer items-center justify-center rounded-lg h-10 px-6 border border-white/10 hover:bg-white/5 transition-colors text-slate-400 text-sm font-medium">
-                    Виж транзакции
                   </button>
                   <button 
                     onClick={() => navigate('/buy-coins')}
@@ -392,40 +389,19 @@ const Dashboard = () => {
                       <span className="text-gray-400">↑</span> —
                     </div>
                   </div>
-                  <button className="w-full py-2 rounded-lg border border-[#5211d4]/30 text-[#5211d4] hover:bg-[#5211d4] hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 group-hover:bg-[#5211d4] group-hover:text-white">
-                    <span className="material-symbols-outlined text-[18px]">auto_awesome</span> Ново четене
-                  </button>
-                </div>
-
-                {/* Partner Profile Card */}
-                <div className="group p-4 rounded-xl bg-[#1f1c27] border border-slate-800/50 hover:border-[#5211d4]/50 transition-all shadow-sm">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-slate-700"></div>
-                      <div>
-                        <h3 className="font-bold text-white">Партньор</h3>
-                        <p className="text-xs text-[#a69db9]">—</p>
-                      </div>
-                    </div>
-                    <button className="text-slate-400 hover:text-white transition-colors">
-                      <span className="material-symbols-outlined text-[20px]">more_vert</span>
-                    </button>
-                  </div>
-                  <div className="flex gap-2 mb-4">
-                    <div className="px-2 py-1 rounded bg-white/5 text-xs font-medium text-slate-300 flex items-center gap-1">
-                      <span className="text-orange-400">☀</span> —
-                    </div>
-                    <div className="px-2 py-1 rounded bg-white/5 text-xs font-medium text-slate-300 flex items-center gap-1">
-                      <span className="text-blue-300">☾</span> —
-                    </div>
-                  </div>
-                  <button className="w-full py-2 rounded-lg border border-white/10 text-slate-300 hover:border-[#5211d4] hover:text-[#5211d4] text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => navigate('/generate-report')}
+                    className="w-full py-2 rounded-lg border border-[#5211d4]/30 text-[#5211d4] hover:bg-[#5211d4] hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 group-hover:bg-[#5211d4] group-hover:text-white"
+                  >
                     <span className="material-symbols-outlined text-[18px]">auto_awesome</span> Ново четене
                   </button>
                 </div>
 
                 {/* Add Profile Button */}
-                <button className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-slate-700 hover:border-[#5211d4] hover:bg-white/5 transition-all group min-h-[180px]">
+                <button
+                  onClick={() => navigate('/profiles')}
+                  className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-slate-700 hover:border-[#5211d4] hover:bg-white/5 transition-all group min-h-[180px]"
+                >
                   <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3 group-hover:bg-[#5211d4]/20 transition-colors">
                     <span className="material-symbols-outlined text-slate-400 group-hover:text-[#5211d4]">add</span>
                   </div>
@@ -443,25 +419,20 @@ const Dashboard = () => {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#5211d4]/20 blur-[60px] rounded-full pointer-events-none"></div>
                 <div>
                   <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl">🪐</span>
-                    <span className="text-white font-bold text-lg">Сатурн ретрограден</span>
+                    <span className="material-symbols-outlined text-[#a69db9]">travel_explore</span>
+                    <span className="text-white font-bold text-lg">Транзитите за днес</span>
                   </div>
                   <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                    Днес настъпва момент на пауза. Влиянието на Сатурн те приканва да преразгледаш дългосрочните си цели. Не бързай с нови договори.
+                    Тук ще виждаш дневния транзит, изчислен по твоята натална карта. Дотогава можеш да генерираш транзитен анализ за днешна дата.
                   </p>
                 </div>
                 <div className="mt-auto pt-4 border-t border-white/10">
-                  <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-slate-400">Настроение</span>
-                    <span className="text-white font-medium">Замислен</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-400">Цвят на късмета</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-indigo-900 border border-white/20"></div>
-                      <span className="text-white font-medium">Индиго</span>
-                    </div>
-                  </div>
+                  <button
+                    onClick={() => navigate('/generate-report')}
+                    className="w-full py-2 rounded-lg border border-[#5211d4]/30 text-[#5211d4] hover:bg-[#5211d4] hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">auto_awesome</span> Транзитен анализ
+                  </button>
                 </div>
               </div>
             </div>
@@ -471,97 +442,18 @@ const Dashboard = () => {
           <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-white tracking-tight">История на отчети</h2>
-              <div className="flex gap-2">
-                <button className="p-2 text-slate-400 hover:text-[#5211d4] transition-colors">
-                  <span className="material-symbols-outlined">filter_list</span>
-                </button>
-                <button className="p-2 text-slate-400 hover:text-[#5211d4] transition-colors">
-                  <span className="material-symbols-outlined">sort</span>
-                </button>
-              </div>
             </div>
-            <div className="w-full overflow-hidden rounded-xl border border-slate-800 shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-white/5 border-b border-slate-800">
-                    <tr>
-                      <th className="px-6 py-4 font-semibold text-slate-300">Тип отчет</th>
-                      <th className="px-6 py-4 font-semibold text-slate-300">Профил</th>
-                      <th className="px-6 py-4 font-semibold text-slate-300">Дата</th>
-                      <th className="px-6 py-4 font-semibold text-slate-300">Статус</th>
-                      <th className="px-6 py-4 font-semibold text-slate-300 text-right">Действие</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800 bg-[#131118]">
-                    <tr className="hover:bg-white/5 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-[#5211d4]/10 text-[#5211d4]">
-                            <span className="material-symbols-outlined text-[20px]">work</span>
-                          </div>
-                          <span className="font-medium text-white">Кариерна прогноза 2024</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-400">{user.full_name || 'Потребител'} (Ти)</td>
-                      <td className="px-6 py-4 text-slate-400">—</td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
-                          Завършен
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="text-[#5211d4] hover:text-[#5211d4]/80 font-medium text-sm inline-flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[18px]">download</span> PDF
-                        </button>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-white/5 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-pink-500/10 text-pink-500">
-                            <span className="material-symbols-outlined text-[20px]">favorite</span>
-                          </div>
-                          <span className="font-medium text-white">Синастрия: Съвместимост</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-400">{user.full_name || 'Потребител'} & Партньор</td>
-                      <td className="px-6 py-4 text-slate-400">—</td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
-                          Завършен
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="text-[#5211d4] hover:text-[#5211d4]/80 font-medium text-sm inline-flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[18px]">download</span> PDF
-                        </button>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-white/5 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500">
-                            <span className="material-symbols-outlined text-[20px]">person_search</span>
-                          </div>
-                          <span className="font-medium text-white">Дълбок анализ на натална карта</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-400">{user.full_name || 'Потребител'} (Ти)</td>
-                      <td className="px-6 py-4 text-slate-400">—</td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
-                          Завършен
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="text-[#5211d4] hover:text-[#5211d4]/80 font-medium text-sm inline-flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[18px]">download</span> PDF
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <div className="w-full rounded-xl border border-dashed border-slate-700 bg-[#131118] px-6 py-10 text-center">
+              <span className="material-symbols-outlined text-slate-500 text-4xl mb-2 block">history</span>
+              <p className="text-white font-semibold mb-1">Още нямате запазени отчети</p>
+              <p className="text-sm text-slate-400 mb-4">Генерирайте първия си анализ, за да започне историята ви.</p>
+              <button
+                onClick={() => navigate('/generate-report')}
+                className="inline-flex items-center gap-2 rounded-lg h-10 px-5 bg-[#5211d4] hover:bg-[#5211d4]/90 transition-colors text-white text-sm font-bold"
+              >
+                <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                Нов анализ
+              </button>
             </div>
             <div className="flex justify-center mt-2">
               <button 
