@@ -8,6 +8,7 @@ import History from './pages/History';
 import Settings from './pages/Settings';
 import { ResetPassword, VerifyEmail } from './pages/AuthLinkPages';
 import Admin from './pages/Admin';
+import Welcome from './pages/Welcome';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/welcome" element={<Welcome />} />
       </Routes>
     </Router>
   );

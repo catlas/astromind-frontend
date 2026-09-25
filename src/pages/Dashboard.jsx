@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
+import { BigThreeCard } from './Welcome';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ const Dashboard = () => {
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const [recentReports, setRecentReports] = useState([]);
   const [verifyMsg, setVerifyMsg] = useState('');
+  const [insight, setInsight] = useState(null);
 
   const resendVerification = async () => {
     try {
@@ -28,7 +30,12 @@ const Dashboard = () => {
     const loadUser = async () => {
       const sessionUser = await verifySession(navigate);
       if (isMounted && sessionUser) {
+        if (sessionUser.onboarding_completed === false) {
+          navigate('/welcome');
+          return;
+        }
         setUser(sessionUser);
+        api.get('/insights/big-three').then((r) => isMounted && setInsight(r.data)).catch(() => {});
         try {
           await migrateLocalData();
           const reports = await fetchReports(3);
@@ -474,6 +481,26 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Първо лично прозрение */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                Твоята „Голяма тройка“{insight?.profile?.name ? ` · ${insight.profile.name}` : ''}
+              </h2>
+            </div>
+            {insight ? (
+              <BigThreeCard insight={insight} />
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-700 bg-[#131118] px-6 py-8 text-center">
+                <p className="text-white font-semibold mb-1">Добавете своите данни за раждане</p>
+                <p className="text-sm text-slate-400 mb-4">Ще видите Слънцето, Луната и Асцендента си с кратко описание — безплатно.</p>
+                <button onClick={() => navigate('/welcome')} className="inline-flex items-center gap-2 rounded-lg h-10 px-5 bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-sm font-bold">
+                  Започни
+                </button>
+              </div>
+            )}
           </div>
 
           {/* History Section */}

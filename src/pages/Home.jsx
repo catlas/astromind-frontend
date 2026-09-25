@@ -52,7 +52,7 @@ const Home = () => {
       if (isLogin) {
         localStorage.setItem('token', response.data.access_token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        navigate('/dashboard');
+        navigate(response.data.user?.onboarding_completed === false ? '/welcome' : '/dashboard');
       } else {
         alert('Успешна регистрация! Изпратихме ви писмо за потвърждение на имейла. Сега влезте в профила си.');
         setIsLogin(true);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Loader2, Sparkles, Calendar, Clock, MapPin, MessageSquare, User, Map, TrendingUp, Heart, Activity, Infinity } from 'lucide-react';
 import AstroChart from '../components/AstroChart';
@@ -51,6 +51,13 @@ const GenerateReport = () => {
   const [error, setError] = useState(null);
   const [monthlyResults, setMonthlyResults] = useState([]); // For chunked PDF generation
   const [savedProfiles, setSavedProfiles] = useState([]);
+  const [searchParams] = useSearchParams();
+
+  // ?profile=Име идва от onboarding или от страницата с профили
+  useEffect(() => {
+    const preset = searchParams.get('profile');
+    if (preset) setName(preset);
+  }, [searchParams]);
   const [billingConfig, setBillingConfig] = useState(null);
   const [crisisHtml, setCrisisHtml] = useState('');
 
