@@ -564,10 +564,12 @@ const DownloadPDFButton = ({
       });
       
       // Call backend to generate DOCX
+      const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/generate-docx`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           user_name: userName,
@@ -590,7 +592,9 @@ const DownloadPDFButton = ({
         }
         const errorText = await response.text();
         console.error('Backend error:', errorText);
-        throw new Error(`DOCX generation failed: ${errorText}`);
+        let detail = null;
+        try { detail = JSON.parse(errorText).detail; } catch { /* не е JSON */ }
+        throw new Error(typeof detail === 'string' ? detail : `DOCX generation failed: ${errorText}`);
       }
       
       console.log('DOCX generated successfully');
@@ -607,7 +611,7 @@ const DownloadPDFButton = ({
     } catch (error) {
       console.error('DOCX Error:', error);
       console.error('Error details:', error.message);
-      alert(`Грешка при генериране на DOCX: ${error.message}\n\nПроверете конзолата за повече детайли.`);
+      alert(`Грешка при генериране на DOCX: ${error.message}`);
     } finally {
       setIsGenerating(false);
     }

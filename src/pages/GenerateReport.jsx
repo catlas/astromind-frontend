@@ -212,7 +212,9 @@ const GenerateReport = () => {
           throw new Error('Сесията е изтекла. Моля влезте отново.');
         }
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          return response.json().catch(() => ({})).then(body => {
+            throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP error! status: ${response.status}`);
+          });
         }
         
         const reader = response.body.getReader();

@@ -53,7 +53,10 @@ const Home = () => {
         errorMessage = `Грешка при свързване със сървъра. Проверете дали backend сървърът работи на ${API_URL}`;
       } else if (error.response) {
         // Сървърът отговори с грешка
-        errorMessage = error.response.data?.detail || error.response.data?.message || `Грешка: ${error.response.status}`;
+        const detail = error.response.data?.detail;
+        errorMessage = (typeof detail === 'string' ? detail : null)
+          || error.response.data?.message
+          || `Грешка: ${error.response.status}`;
       } else if (error.request) {
         // Заявката беше изпратена, но няма отговор
         errorMessage = 'Няма отговор от сървъра. Проверете връзката.';
@@ -657,8 +660,15 @@ const Home = () => {
                 className="w-full bg-[#0B0616] border border-white/10 p-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5211d4]"
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+                minLength={isLogin ? undefined : 10}
                 required
               />
+              {!isLogin && (
+                <p className="text-xs text-gray-400 -mt-1">
+                  Поне 10 символа, с поне една буква и една цифра.
+                </p>
+              )}
               <button 
                 type="submit"
                 disabled={authLoading}
