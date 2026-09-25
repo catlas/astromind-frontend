@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
-import { deleteReport, fetchReport, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
+import { api, deleteReport, fetchReport, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 
 export default function History() {
   const navigate = useNavigate();
@@ -535,6 +535,7 @@ export default function History() {
               </button>
               <button
                 onClick={() => {
+                  api.post('/events', { name: 'report_downloaded' }).catch(() => {});
                   const text = new DOMParser().parseFromString(DOMPurify.sanitize(viewingItem.content || ''), 'text/html').body.innerText;
                   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
                   const url = URL.createObjectURL(blob);

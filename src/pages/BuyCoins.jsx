@@ -49,6 +49,7 @@ const BuyCoins = () => {
         if (isMounted) setConfig({ payments_enabled: false, packages: [], costs: {} });
       }
       refresh();
+      api.post('/events', { name: 'pricing_viewed' }).catch(() => {});
     };
     load();
     return () => { isMounted = false; };

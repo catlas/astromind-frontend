@@ -52,6 +52,7 @@ const GenerateReport = () => {
   const [monthlyResults, setMonthlyResults] = useState([]); // For chunked PDF generation
   const [savedProfiles, setSavedProfiles] = useState([]);
   const [billingConfig, setBillingConfig] = useState(null);
+  const [crisisHtml, setCrisisHtml] = useState('');
 
   const updateBalance = (balance) => {
     if (balance === null || balance === undefined) return;
@@ -81,6 +82,7 @@ const GenerateReport = () => {
         setUser(sessionUser);
         refreshSavedProfiles();
         api.get('/billing/config').then((r) => setBillingConfig(r.data)).catch(() => {});
+        api.post('/events', { name: 'report_form_opened' }).catch(() => {});
       }
     };
 
@@ -319,6 +321,13 @@ const GenerateReport = () => {
               }));
               break;
               
+            case 'crisis':
+              setCrisisHtml(data.html || '');
+              setLoadingMessage('');
+              clearTimeout(timeoutId);
+              resolve();
+              break;
+
             case 'complete':
               updateBalance(data.balance);
               setLoadingMessage('');
@@ -373,6 +382,7 @@ const GenerateReport = () => {
     setLoadingMessage('');
     setError(null);
     setResult(null);
+    setCrisisHtml('');
 
     try {
       // Валидация
@@ -461,8 +471,12 @@ const GenerateReport = () => {
           timeout: 300000  // 300 seconds timeout (5 min) for Ollama
         });
 
-        setResult(response.data);
-        updateBalance(response.data.balance);
+        if (response.data.crisis) {
+          setCrisisHtml(response.data.interpretation);
+        } else {
+          setResult(response.data);
+          updateBalance(response.data.balance);
+        }
       }
       
       // Запазване на профила на сървъра
@@ -1118,6 +1132,13 @@ const GenerateReport = () => {
                 </button>
               </form>
             </div>
+
+            {crisisHtml && (
+              <div
+                className="bg-indigo-950/60 border border-indigo-400/40 rounded-lg p-6 text-indigo-50 space-y-3 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(crisisHtml) }}
+              />
+            )}
 
             {/* Error Message */}
             {error && (

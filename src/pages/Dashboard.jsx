@@ -328,6 +328,12 @@ const Dashboard = () => {
             </p>
           </div>
 
+          {user.is_admin && (
+            <button onClick={() => navigate('/admin')} className="text-sm text-[#a78bfa] hover:text-white flex items-center gap-1">
+              <span className="material-symbols-outlined text-[18px]">monitoring</span> Статистика (админ)
+            </button>
+          )}
+
           {user.email_verified === false && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl border border-yellow-500/20 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
               <span className="material-symbols-outlined text-yellow-400">mark_email_unread</span>
