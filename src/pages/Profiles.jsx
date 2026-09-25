@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
+import { api, apiErrorMessage, fetchProfiles, migrateLocalData } from '../utils/api';
 
 const relationOptions = [
   { value: 'self', label: 'Аз' },
@@ -40,87 +41,47 @@ const Profiles = () => {
     lon: '',
   });
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadUser = async () => {
-      const sessionUser = await verifySession(navigate);
-      if (isMounted && sessionUser) setUser(sessionUser);
-    };
-    loadUser();
-    loadProfilesFromStorage();
-    return () => { isMounted = false; };
-  }, [navigate]);
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  // Зареждане на профили от localStorage
-  const loadProfilesFromStorage = () => {
+  const toUiProfile = (p) => ({
+    ...p,
+    relationLabel: relationOptions.find((r) => r.value === p.relation)?.label || 'Друг',
+    gender: p.gender || 'other',
+    lat: p.lat ?? '',
+    lon: p.lon ?? '',
+  });
+
+  const loadProfiles = async () => {
     try {
-      const items = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('astro_profile_')) {
-          const data = JSON.parse(localStorage.getItem(key));
-          const name = key.replace('astro_profile_', '');
-          items.push({
-            id: key,
-            name: name,
-            relation: data.partnerData ? 'partner' : 'self',
-            relationLabel: data.partnerData ? 'Партньор' : 'Аз',
-            gender: 'other',
-            birth_date: data.date || '',
-            birth_time: data.time || '',
-            unknown_time: !data.time,
-            birth_place: data.selectedCity || '',
-            lat: data.lat || '',
-            lon: data.lon || '',
-            is_primary: items.length === 0,
-          });
-        }
-      }
-      if (items.length === 0) {
-        setProfiles([]);
-      } else {
-        setProfiles(items);
-      }
+      await migrateLocalData();
+      const items = await fetchProfiles();
+      setProfiles(items.map(toUiProfile));
     } catch (err) {
       console.error('Грешка при зареждане на профили:', err);
       setProfiles([]);
     }
   };
 
-  // Запазване на профил в localStorage
-  const saveProfileToStorage = (profileData) => {
-    try {
-      const key = `astro_profile_${profileData.name}`;
-      const existing = JSON.parse(localStorage.getItem(key) || '{}');
-      const data = {
-        ...existing,
-        date: profileData.birth_date,
-        time: profileData.unknown_time ? '' : profileData.birth_time,
-        lat: profileData.lat,
-        lon: profileData.lon,
-        selectedCity: profileData.birth_place,
-      };
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch (err) {
-      console.error('Грешка при запазване на профил:', err);
-    }
-  };
-
-  // Изтриване на профил от localStorage
-  const deleteProfileFromStorage = (profileName) => {
-    try {
-      const key = `astro_profile_${profileName}`;
-      localStorage.removeItem(key);
-    } catch (err) {
-      console.error('Грешка при изтриване на профил:', err);
-    }
-  };
+  useEffect(() => {
+    let isMounted = true;
+    const loadUser = async () => {
+      const sessionUser = await verifySession(navigate);
+      if (isMounted && sessionUser) {
+        setUser(sessionUser);
+        loadProfiles();
+      }
+    };
+    loadUser();
+    return () => { isMounted = false; };
+  }, [navigate]);
 
   const handleLogout = () => {
     clearSessionAndRedirect(navigate);
   };
 
   const handleEdit = (profile) => {
+    setSaveError('');
     setEditingId(profile.id);
     setForm({
       name: profile.name,
@@ -130,25 +91,24 @@ const Profiles = () => {
       birth_time: profile.birth_time || '',
       unknown_time: profile.unknown_time,
       birth_place: profile.birth_place || '',
-      lat: profile.lat || '',
-      lon: profile.lon || '',
+      lat: profile.lat ?? '',
+      lon: profile.lon ?? '',
     });
   };
 
-  const handleDelete = (id) => {
-    const profile = profiles.find(p => p.id === id);
-    if (profile) {
-      deleteProfileFromStorage(profile.name);
-    }
-    setProfiles(profiles.filter((p) => p.id !== id));
-    if (editingId === id) {
-      setEditingId(null);
-      resetForm();
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/profiles/${id}`);
+      if (editingId === id) resetForm();
+      await loadProfiles();
+    } catch (err) {
+      setSaveError(apiErrorMessage(err, 'Профилът не беше изтрит.'));
     }
   };
 
   const resetForm = () => {
     setEditingId(null);
+    setSaveError('');
     setForm({
       name: '',
       relation: 'self',
@@ -162,33 +122,35 @@ const Profiles = () => {
     });
   };
 
-  const handleSave = () => {
-    const relationLabel = relationOptions.find((r) => r.value === form.relation)?.label || '';
-
-    if (editingId) {
-      const oldProfile = profiles.find(p => p.id === editingId);
-      if (oldProfile && oldProfile.name !== form.name) {
-        deleteProfileFromStorage(oldProfile.name);
+  const handleSave = async () => {
+    const existing = editingId ? profiles.find((p) => p.id === editingId) : null;
+    const body = {
+      name: form.name,
+      relation: form.relation,
+      gender: form.gender,
+      birth_date: form.birth_date,
+      birth_time: form.unknown_time ? '' : form.birth_time,
+      unknown_time: form.unknown_time,
+      birth_place: form.birth_place,
+      lat: form.lat === '' ? null : Number(form.lat),
+      lon: form.lon === '' ? null : Number(form.lon),
+      settings: existing?.settings,
+    };
+    setSaving(true);
+    setSaveError('');
+    try {
+      if (editingId) {
+        await api.put(`/profiles/${editingId}`, body);
+      } else {
+        await api.post('/profiles', body);
       }
-      setProfiles(
-        profiles.map((p) =>
-          p.id === editingId
-            ? { ...p, ...form, relationLabel }
-            : p
-        )
-      );
-    } else {
-      const newProfile = {
-        id: `astro_profile_${form.name}`,
-        ...form,
-        relationLabel,
-        is_primary: profiles.length === 0,
-      };
-      setProfiles([...profiles, newProfile]);
+      resetForm();
+      await loadProfiles();
+    } catch (err) {
+      setSaveError(apiErrorMessage(err, 'Профилът не беше запазен.'));
+    } finally {
+      setSaving(false);
     }
-    
-    saveProfileToStorage(form);
-    resetForm();
   };
 
   const handleChange = (field, value) => {
@@ -652,11 +614,16 @@ const Profiles = () => {
                     </div>
                   </div>
 
+                  {saveError && (
+                    <p className="text-sm text-red-400">{saveError}</p>
+                  )}
+
                   {/* Action Buttons */}
                   <div className="flex gap-3">
                     <button
                       onClick={handleSave}
-                      className="flex-1 py-2.5 rounded-lg bg-[#5211d4] hover:bg-[#5211d4]/90 transition-all text-white text-sm font-bold shadow-lg shadow-[#5211d4]/20 flex items-center justify-center gap-2"
+                      disabled={saving || !form.name.trim() || !form.birth_date}
+                      className="disabled:opacity-50 disabled:cursor-not-allowed flex-1 py-2.5 rounded-lg bg-[#5211d4] hover:bg-[#5211d4]/90 transition-all text-white text-sm font-bold shadow-lg shadow-[#5211d4]/20 flex items-center justify-center gap-2"
                     >
                       <span className="material-symbols-outlined text-[18px]">save</span>
                       {editingId ? 'Запази промени' : 'Създай профил'}

@@ -6,6 +6,7 @@ import GenerateReport from './pages/GenerateReport';
 import Profiles from './pages/Profiles';
 import History from './pages/History';
 import Settings from './pages/Settings';
+import { ResetPassword, VerifyEmail } from './pages/AuthLinkPages';
 
 function App() {
   return (
@@ -18,6 +19,8 @@ function App() {
         <Route path="/profiles" element={<Profiles />} />
         <Route path="/history" element={<History />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
       </Routes>
     </Router>
   );

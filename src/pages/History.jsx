@@ -1,38 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
-
-// Load history from localStorage
-const loadHistory = () => {
-  try {
-    const raw = localStorage.getItem('astro_history');
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-// Save history to localStorage
-const saveHistory = (items) => {
-  localStorage.setItem('astro_history', JSON.stringify(items));
-};
-
-// По-рано страницата записваше 10 демо отчета в браузъра на всеки нов потребител.
-// Тези записи се разпознават по съдържанието си и се премахват при зареждане.
-const LEGACY_DEMO_CONTENT = new Set([
-  'Вашата кариера през 2024 е под влиянието на Сатурн в Риби...',
-  'Съвместимостта между двамата показва силна венера-марс връзка...',
-  'Вашата натална карта разкрива силен Скорпион Асцендент...',
-  'Днес Луната във Водолей подкрепя иновациите...',
-  'Ноември носи трансформация във вашата 10-та къща...',
-  'Отговорът на вашия въпрос се крие в 7-мия дом...',
-  '2025 е година на разширение с Юпитер в Близнаци...',
-  'Кармичният ви път е свързан с лечение и служба...',
-  'Предстои обработка...',
-  'Основен анализ на натална карта...',
-]);
-
-const removeLegacyDemo = (items) => items.filter((item) => !LEGACY_DEMO_CONTENT.has(item.content));
+import { deleteReport, fetchReport, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 
 export default function History() {
   const navigate = useNavigate();
@@ -43,13 +13,35 @@ export default function History() {
   const [viewingItem, setViewingItem] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  // Load history from localStorage (без демо данни)
-  const [history, setHistory] = useState(() => {
-    const existing = loadHistory();
-    const cleaned = removeLegacyDemo(existing);
-    if (cleaned.length !== existing.length) saveHistory(cleaned);
-    return cleaned;
-  });
+  // Историята идва от сървъра
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [viewLoading, setViewLoading] = useState(false);
+
+  const loadReports = async () => {
+    try {
+      await migrateLocalData();
+      const items = await fetchReports();
+      setHistory(items.map((r) => ({ ...r, date: formatDate(r.created_at) })));
+    } catch (err) {
+      console.error('Грешка при зареждане на историята:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openReport = async (item) => {
+    setViewingItem({ ...item, content: '' });
+    setViewLoading(true);
+    try {
+      const full = await fetchReport(item.id);
+      setViewingItem({ ...item, content: full.content });
+    } catch {
+      setViewingItem({ ...item, content: '<p>Отчетът не можа да бъде зареден.</p>' });
+    } finally {
+      setViewLoading(false);
+    }
+  };
 
   const [filterType, setFilterType] = useState('all');
   const [filterProfile, setFilterProfile] = useState('all');
@@ -61,27 +53,24 @@ export default function History() {
     let isMounted = true;
     const loadUser = async () => {
       const sessionUser = await verifySession(navigate);
-      if (isMounted && sessionUser) setUser(sessionUser);
+      if (isMounted && sessionUser) {
+        setUser(sessionUser);
+        loadReports();
+      }
     };
     loadUser();
     return () => { isMounted = false; };
   }, [navigate]);
 
   const typeIcons = {
-    natal: 'account_circle', daily: 'wb_sunny', question: 'help',
-    monthly: 'calendar_month', synastry: 'favorite', yearly: 'event',
-    career: 'work', karmic: 'auto_awesome'
+    general: 'auto_awesome', health: 'favorite_border', career: 'work',
+    money: 'payments', love: 'favorite', karmic: 'all_inclusive'
   };
   const typeColors = {
-    natal: '#a78bfa', daily: '#fbbf24', question: '#f87171',
-    monthly: '#60a5fa', synastry: '#f472b6', yearly: '#34d399',
-    career: '#a3e635', karmic: '#c084fc'
+    general: '#a78bfa', health: '#34d399', career: '#a3e635',
+    money: '#fbbf24', love: '#f472b6', karmic: '#c084fc'
   };
-  const typeLabels = {
-    natal: 'Натална карта', daily: 'Дневен аспект', question: 'Конкретен въпрос',
-    monthly: 'Месечен анализ', synastry: 'Синастрия', yearly: 'Годишен доклад',
-    career: 'Кариерна прогноза', karmic: 'Кармичен анализ'
-  };
+  const typeLabels = REPORT_TYPE_LABELS;
 
   const filteredHistory = history.filter(item => {
     if (filterType !== 'all' && item.type !== filterType) return false;
@@ -406,9 +395,9 @@ export default function History() {
               <tbody>
                 {filteredHistory.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-4 py-12 text-center text-[#d4c8ed]">
+                    <td colSpan="6" className="px-4 py-12 text-center text-[#d4c8ed]">
                       <span className="material-symbols-outlined text-4xl mb-2 block">{history.length === 0 ? 'history' : 'search_off'}</span>
-                      {history.length === 0 ? 'Още нямате запазени отчети' : 'Няма намерени отчети'}
+                      {historyLoading ? 'Зареждане…' : history.length === 0 ? 'Още нямате запазени отчети. Всеки нов анализ се запазва тук автоматично.' : 'Няма намерени отчети'}
                     </td>
                   </tr>
                 ) : (
@@ -445,7 +434,7 @@ export default function History() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => setViewingItem(item)}
+                            onClick={() => openReport(item)}
                             className="p-1.5 rounded-lg text-[#d4c8ed] hover:text-white hover:bg-white/10 transition-colors"
                             title="Преглед"
                           >
@@ -527,7 +516,14 @@ export default function History() {
             </div>
             <div className="p-6">
               <div className="bg-[#161022] rounded-lg p-4 border border-[#302240]">
-                <p className="text-white leading-relaxed">{viewingItem.content || 'Няма съдържание'}</p>
+                {viewLoading ? (
+                  <p className="text-[#d4c8ed]">Зареждане…</p>
+                ) : (
+                  <div
+                    className="text-white leading-relaxed prose prose-invert max-w-none"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(viewingItem.content || 'Няма съдържание') }}
+                  />
+                )}
               </div>
             </div>
             <div className="p-6 border-t border-[#302240] flex justify-end gap-3">
@@ -539,7 +535,8 @@ export default function History() {
               </button>
               <button
                 onClick={() => {
-                  const blob = new Blob([viewingItem.content || ''], { type: 'text/plain' });
+                  const text = new DOMParser().parseFromString(DOMPurify.sanitize(viewingItem.content || ''), 'text/html').body.innerText;
+                  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
@@ -577,10 +574,13 @@ export default function History() {
                   Отказ
                 </button>
                 <button
-                  onClick={() => {
-                    const updated = history.filter(h => h.id !== deleteConfirm.id);
-                    setHistory(updated);
-                    saveHistory(updated);
+                  onClick={async () => {
+                    try {
+                      await deleteReport(deleteConfirm.id);
+                      setHistory(history.filter(h => h.id !== deleteConfirm.id));
+                    } catch (err) {
+                      alert('Отчетът не беше изтрит. Опитайте отново.');
+                    }
                     setDeleteConfirm(null);
                   }}
                   className="px-4 py-2 rounded-lg bg-[#f87171] text-white hover:bg-[#ef4444] transition-colors"

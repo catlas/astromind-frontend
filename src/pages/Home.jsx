@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { getApiBaseUrl } from '../utils/auth';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -11,6 +12,22 @@ const Home = () => {
   const [fullName, setFullName] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState('');
+
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    try {
+      const response = await axios.post(`${getApiBaseUrl()}/forgot-password`, { email });
+      setForgotMsg(response.data?.message || 'Проверете пощата си.');
+    } catch (error) {
+      const detail = error?.response?.data?.detail;
+      setForgotMsg(typeof detail === 'string' ? detail : 'Заявката не успя. Опитайте отново.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -37,7 +54,7 @@ const Home = () => {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         navigate('/dashboard');
       } else {
-        alert('Успешна регистрация! Сега влезте в профила си.');
+        alert('Успешна регистрация! Изпратихме ви писмо за потвърждение на имейла. Сега влезте в профила си.');
         setIsLogin(true);
         setEmail('');
         setPassword('');
@@ -634,6 +651,32 @@ const Home = () => {
       {showAuth && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-[#1f1c27] p-8 rounded-2xl max-w-md w-full border border-white/10">
+            {forgotMode ? (
+              <>
+                <h2 className="text-2xl font-bold mb-2">Забравена парола</h2>
+                <p className="text-sm text-gray-400 mb-6">Въведете имейла си и ще ви изпратим линк за нова парола.</p>
+                <form onSubmit={handleForgot} className="space-y-4">
+                  <input
+                    type="email"
+                    placeholder="Имейл"
+                    className="w-full bg-[#0B0616] border border-white/10 p-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5211d4]"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                  <button type="submit" disabled={authLoading} className="w-full bg-[#5211d4] hover:bg-[#5211d4]/90 py-3 rounded-lg font-bold disabled:opacity-50">
+                    {authLoading ? 'Изпращане…' : 'Изпрати линк'}
+                  </button>
+                </form>
+                {forgotMsg && <p className="mt-4 text-sm text-green-400">{forgotMsg}</p>}
+                <div className="mt-4 text-center">
+                  <button onClick={() => { setForgotMode(false); setForgotMsg(''); }} className="text-[#5211d4] hover:text-[#5211d4]/80 text-sm">
+                    Обратно към входа
+                  </button>
+                </div>
+              </>
+            ) : (
+            <>
             <h2 className="text-2xl font-bold mb-6">{isLogin ? 'Добре дошли отново' : 'Създай акаунт'}</h2>
             <form onSubmit={handleAuth} className="space-y-4">
               {!isLogin && (
@@ -669,6 +712,13 @@ const Home = () => {
                   Поне 10 символа, с поне една буква и една цифра.
                 </p>
               )}
+              {isLogin && (
+                <div className="text-right -mt-1">
+                  <button type="button" onClick={() => { setForgotMode(true); setForgotMsg(''); }} className="text-xs text-gray-400 hover:text-white">
+                    Забравена парола?
+                  </button>
+                </div>
+              )}
               <button 
                 type="submit"
                 disabled={authLoading}
@@ -695,8 +745,10 @@ const Home = () => {
                 {isLogin ? 'Нямаш акаунт? Регистрирай се' : 'Вече имаш акаунт? Влез'}
               </button>
             </div>
+            </>
+            )}
             <button 
-              onClick={() => { setShowAuth(false); setEmail(''); setPassword(''); setFullName(''); }} 
+              onClick={() => { setShowAuth(false); setForgotMode(false); setForgotMsg(''); setEmail(''); setPassword(''); setFullName(''); }} 
               className="mt-4 text-slate-400 hover:text-slate-300 text-sm w-full"
             >
               Затвори

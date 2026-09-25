@@ -140,7 +140,8 @@ export default function Settings() {
         { full_name: fullName, email },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const updated = response.data;
+      const { access_token: newToken, ...updated } = response.data;
+      if (newToken) localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(updated));
       setUser(updated);
       showMsg(setAccountMsg, 'Промените са запазени успешно.');
@@ -152,26 +153,38 @@ export default function Settings() {
     }
   };
 
+  const handleResendVerification = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${getApiBaseUrl()}/resend-verification`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      showMsg(setAccountMsg, response.data?.message || 'Изпратихме писмо за потвърждение.');
+    } catch (err) {
+      showMsg(setAccountMsg, err?.response?.data?.detail || 'Писмото не беше изпратено.', true);
+    }
+  };
+
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
       showMsg(setPasswordMsg, 'Паролите не съвпадат.', true);
       return;
     }
-    if (newPassword.length < 6) {
-      showMsg(setPasswordMsg, 'Паролата трябва да е поне 6 символа.', true);
+    if (newPassword.length < 10) {
+      showMsg(setPasswordMsg, 'Паролата трябва да е поне 10 символа, с буква и цифра.', true);
       return;
     }
     setPasswordSaving(true);
     try {
       const token = localStorage.getItem('token');
       const apiUrl = getApiBaseUrl();
-      await axios.post(
+      const response = await axios.post(
         `${apiUrl}/change-password`,
         { current_password: currentPassword, new_password: newPassword },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      showMsg(setPasswordMsg, 'Паролата е сменена успешно.');
+      // Старите сесии спират да важат; тази продължава с новия токен
+      if (response.data?.access_token) localStorage.setItem('token', response.data.access_token);
+      showMsg(setPasswordMsg, 'Паролата е сменена успешно. Излязохте от другите устройства.');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -198,15 +211,16 @@ export default function Settings() {
     if (key === 'astro_notif_promo') setNotifPromo(value);
   };
 
-  const handleExportData = () => {
-    const data = {
-      user: { full_name: user?.full_name, email: user?.email, coins: user?.coins },
-      profiles: Object.keys(localStorage)
-        .filter(k => k.startsWith('astro_profile_'))
-        .reduce((acc, k) => { acc[k] = JSON.parse(localStorage.getItem(k)); return acc; }, {}),
-      history: JSON.parse(localStorage.getItem('astro_history') || '[]'),
-      exportedAt: new Date().toISOString(),
-    };
+  const handleExportData = async () => {
+    let data;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${getApiBaseUrl()}/me/export`, { headers: { Authorization: `Bearer ${token}` } });
+      data = response.data;
+    } catch (err) {
+      alert(err?.response?.data?.detail || 'Експортът не успя. Опитайте отново.');
+      return;
+    }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -405,6 +419,24 @@ export default function Settings() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ivan@example.com"
                   />
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  {user.email_verified ? (
+                    <span className="flex items-center gap-1 text-green-400">
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>verified</span>
+                      Имейлът е потвърден
+                    </span>
+                  ) : (
+                    <>
+                      <span className="flex items-center gap-1 text-yellow-400">
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>mark_email_unread</span>
+                        Имейлът не е потвърден
+                      </span>
+                      <button type="button" onClick={handleResendVerification} className="text-[#a78bfa] hover:text-white underline">
+                        Изпрати писмо отново
+                      </button>
+                    </>
+                  )}
                 </div>
                 {accountMsg && (
                   <div className={`px-4 py-3 rounded-xl text-sm flex items-center gap-2 ${accountMsg.error ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-green-500/10 border border-green-500/20 text-green-400'}`}>

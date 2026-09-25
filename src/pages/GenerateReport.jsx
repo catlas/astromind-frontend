@@ -7,6 +7,7 @@ import DownloadPDFButton from '../components/DownloadPDFButton';
 import ChartSummary from '../components/ChartSummary';
 import { bulgarianCities } from '../utils/bulgarianCities';
 import { clearSessionAndRedirect, getApiBaseUrl, verifySession } from '../utils/auth';
+import { fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
 import DOMPurify from 'dompurify';
 
 const GenerateReport = () => {
@@ -49,6 +50,16 @@ const GenerateReport = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [monthlyResults, setMonthlyResults] = useState([]); // For chunked PDF generation
+  const [savedProfiles, setSavedProfiles] = useState([]);
+
+  const refreshSavedProfiles = async () => {
+    try {
+      await migrateLocalData();
+      setSavedProfiles(await fetchProfiles());
+    } catch (err) {
+      console.error('Грешка при зареждане на профилите:', err);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -57,6 +68,7 @@ const GenerateReport = () => {
       const sessionUser = await verifySession(navigate);
       if (isMounted && sessionUser) {
         setUser(sessionUser);
+        refreshSavedProfiles();
       }
     };
 
@@ -79,51 +91,56 @@ const GenerateReport = () => {
     };
   }, [navigate]);
 
-  // Local Storage функции
+  // Профилите се пазят на сървъра; настройките на формата са в profile.settings
   const loadProfile = (profileName) => {
     if (!profileName) return;
-    
-    try {
-      const saved = localStorage.getItem(`astro_profile_${profileName}`);
-      if (saved) {
-        const data = JSON.parse(saved);
-        setFormData({
-          date: data.date || '',
-          time: data.time || '',
-          lat: data.lat || '',
-          lon: data.lon || '',
-          question: data.question || '',
-        });
-        setSelectedCity(data.selectedCity || '');
-        if (data.transitData) {
-          setTransitData(data.transitData);
-          setEnableTransit(data.enableTransit || false);
-        }
-        if (data.partnerData) {
-          setPartnerData(data.partnerData);
-          setSelectedPartnerCity(data.selectedPartnerCity || '');
-          setEnablePartner(data.enablePartner || false);
-        }
-      }
-    } catch (err) {
-      console.error('Грешка при зареждане на профил:', err);
+    const profile = savedProfiles.find((p) => p.name === profileName.trim());
+    if (!profile) return;
+    const settings = profile.settings || {};
+    setFormData({
+      date: profile.birth_date || '',
+      time: profile.birth_time || '',
+      lat: profile.lat != null ? String(profile.lat) : '',
+      lon: profile.lon != null ? String(profile.lon) : '',
+      question: settings.question || '',
+    });
+    setSelectedCity(profile.birth_place || settings.selectedCity || '');
+    if (settings.transitData) {
+      setTransitData(settings.transitData);
+      setEnableTransit(settings.enableTransit || false);
+    }
+    if (settings.partnerData) {
+      setPartnerData(settings.partnerData);
+      setSelectedPartnerCity(settings.selectedPartnerCity || '');
+      setEnablePartner(settings.enablePartner || false);
     }
   };
 
-  const saveProfile = (profileName, data) => {
+  const saveProfile = async (profileName, data) => {
     if (!profileName) return;
-    
     try {
-      const profileData = {
-        ...data,
-        selectedCity: selectedCity,
-        transitData: transitData,
-        enableTransit: enableTransit,
-        partnerData: partnerData,
-        selectedPartnerCity: selectedPartnerCity,
-        enablePartner: enablePartner,
-      };
-      localStorage.setItem(`astro_profile_${profileName}`, JSON.stringify(profileData));
+      const existing = savedProfiles.find((p) => p.name === profileName.trim());
+      await upsertProfile({
+        name: profileName.trim(),
+        relation: existing?.relation || 'self',
+        gender: existing?.gender || null,
+        birth_date: data.date,
+        birth_time: data.time || '',
+        unknown_time: !data.time,
+        birth_place: selectedCity || existing?.birth_place || '',
+        lat: data.lat === '' ? null : Number(data.lat),
+        lon: data.lon === '' ? null : Number(data.lon),
+        settings: {
+          question: data.question || '',
+          selectedCity,
+          transitData,
+          enableTransit,
+          partnerData,
+          selectedPartnerCity,
+          enablePartner,
+        },
+      });
+      refreshSavedProfiles();
     } catch (err) {
       console.error('Грешка при запазване на профил:', err);
     }
@@ -138,7 +155,7 @@ const GenerateReport = () => {
       
       return () => clearTimeout(timeoutId);
     }
-  }, [name]);
+  }, [name, savedProfiles]);
 
   // Автоматично попълване на координати при избор на град
   useEffect(() => {
@@ -434,7 +451,7 @@ const GenerateReport = () => {
         setResult(response.data);
       }
       
-      // Запазване на данните в Local Storage
+      // Запазване на профила на сървъра
       if (name) {
         saveProfile(name, {
           date: formData.date,
@@ -612,9 +629,13 @@ const GenerateReport = () => {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    list="saved-profiles"
                     placeholder="Въведете име за запазване на данните..."
                     className="w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
                   />
+                  <datalist id="saved-profiles">
+                    {savedProfiles.map((p) => <option key={p.id} value={p.name} />)}
+                  </datalist>
                 </div>
 
                 {/* City Selector */}

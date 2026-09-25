@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clearSessionAndRedirect, verifySession } from '../utils/auth';
+import { api, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -8,6 +9,18 @@ const Dashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [recentReports, setRecentReports] = useState([]);
+  const [verifyMsg, setVerifyMsg] = useState('');
+
+  const resendVerification = async () => {
+    try {
+      const response = await api.post('/resend-verification');
+      setVerifyMsg(response.data?.message || 'Изпратихме писмо.');
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setVerifyMsg(typeof detail === 'string' ? detail : 'Писмото не беше изпратено.');
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -16,6 +29,13 @@ const Dashboard = () => {
       const sessionUser = await verifySession(navigate);
       if (isMounted && sessionUser) {
         setUser(sessionUser);
+        try {
+          await migrateLocalData();
+          const reports = await fetchReports(3);
+          if (isMounted) setRecentReports(reports);
+        } catch (err) {
+          console.error('Грешка при зареждане на отчетите:', err);
+        }
       }
     };
 
@@ -308,6 +328,18 @@ const Dashboard = () => {
             </p>
           </div>
 
+          {user.email_verified === false && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-yellow-500/20 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+              <span className="material-symbols-outlined text-yellow-400">mark_email_unread</span>
+              <span className="flex-1 min-w-[200px]">Потвърдете имейла си ({user.email}), за да можете да възстановите паролата си при нужда.</span>
+              {verifyMsg ? (
+                <span className="text-yellow-100">{verifyMsg}</span>
+              ) : (
+                <button onClick={resendVerification} className="underline hover:text-white">Изпрати писмото отново</button>
+              )}
+            </div>
+          )}
+
           {/* Balance Card */}
           <div className="w-full">
             <div className="flex flex-col items-stretch justify-start rounded-2xl overflow-hidden lg:flex-row lg:items-center bg-[#1f1c27] shadow-sm border border-slate-800/50">
@@ -443,6 +475,24 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-white tracking-tight">История на отчети</h2>
             </div>
+            {recentReports.length > 0 ? (
+              <div className="w-full rounded-xl border border-slate-800 bg-[#131118] divide-y divide-slate-800">
+                {recentReports.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => navigate('/history')}
+                    className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[#a78bfa]">auto_awesome</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate">{r.label}</p>
+                      <p className="text-xs text-slate-400">{REPORT_TYPE_LABELS[r.type] || r.type}{r.profile ? ` · ${r.profile}` : ''}</p>
+                    </div>
+                    <span className="text-sm text-slate-400">{formatDate(r.created_at)}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
             <div className="w-full rounded-xl border border-dashed border-slate-700 bg-[#131118] px-6 py-10 text-center">
               <span className="material-symbols-outlined text-slate-500 text-4xl mb-2 block">history</span>
               <p className="text-white font-semibold mb-1">Още нямате запазени отчети</p>
@@ -455,6 +505,7 @@ const Dashboard = () => {
                 Нов анализ
               </button>
             </div>
+            )}
             <div className="flex justify-center mt-2">
               <button 
                 onClick={() => navigate('/history')}
