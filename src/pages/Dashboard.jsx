@@ -341,6 +341,28 @@ const Dashboard = () => {
             </button>
           )}
 
+          {user.terms_accepted === false && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-3 text-sm text-purple-100">
+              <span className="material-symbols-outlined text-purple-300">gavel</span>
+              <span className="flex-1 min-w-[200px]">
+                Обновихме <a href="#/legal/terms" className="underline">Общите условия</a> и{' '}
+                <a href="#/legal/privacy" className="underline">Политиката за поверителност</a>. Моля, прегледайте ги и потвърдете.
+              </span>
+              <button
+                onClick={async () => {
+                  try {
+                    const r = await api.post('/accept-terms');
+                    setUser(r.data);
+                    localStorage.setItem('user', JSON.stringify(r.data));
+                  } catch { /* ще опита отново */ }
+                }}
+                className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold"
+              >
+                Приемам
+              </button>
+            </div>
+          )}
+
           {user.email_verified === false && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl border border-yellow-500/20 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
               <span className="material-symbols-outlined text-yellow-400">mark_email_unread</span>

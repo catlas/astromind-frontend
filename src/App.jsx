@@ -9,6 +9,7 @@ import Settings from './pages/Settings';
 import { ResetPassword, VerifyEmail } from './pages/AuthLinkPages';
 import Admin from './pages/Admin';
 import Welcome from './pages/Welcome';
+import Legal from './pages/Legal';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/welcome" element={<Welcome />} />
+        <Route path="/legal/:doc" element={<Legal />} />
       </Routes>
     </Router>
   );

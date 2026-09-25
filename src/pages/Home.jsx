@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/auth';
@@ -14,6 +14,23 @@ const Home = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotMsg, setForgotMsg] = useState('');
+  const [acceptTerms, setAcceptTerms] = useState(false);
+
+  // С HashRouter линкове като #features биха сменили маршрута; вместо това скролваме до секцията
+  useEffect(() => {
+    const onClick = (e) => {
+      const link = e.target.closest?.('a[href^="#"]');
+      const href = link?.getAttribute('href') || '';
+      if (!link || href.startsWith('#/') || href === '#') return;
+      const target = document.getElementById(href.slice(1));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
 
   const handleForgot = async (e) => {
     e.preventDefault();
@@ -33,7 +50,7 @@ const Home = () => {
     e.preventDefault();
     setAuthLoading(true);
     const endpoint = isLogin ? '/login' : '/register';
-    const data = isLogin ? { email, password } : { email, password, full_name: fullName };
+    const data = isLogin ? { email, password } : { email, password, full_name: fullName, accept_terms: acceptTerms };
     
     // Динамичен избор на URL:
     // - В production (hostname != localhost): използва Render.com API
@@ -625,7 +642,7 @@ const Home = () => {
               <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">Продукт</h3>
               <a href="#features" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Функции</a>
               <a href="#pricing" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Цени</a>
-              <a href="/buy-coins" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">AstroМонети</a>
+              <a href="#/buy-coins" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">AstroМонети</a>
             </div>
             <div className="flex flex-col gap-4">
               <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">Компания</h3>
@@ -635,14 +652,16 @@ const Home = () => {
             </div>
             <div className="flex flex-col gap-4">
               <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">Правни</h3>
-              <a href="#" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Политика за поверителност</a>
-              <a href="#" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Общи условия</a>
+              <a href="#/legal/privacy" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Политика за поверителност</a>
+              <a href="#/legal/terms" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Общи условия</a>
+              <a href="#/legal/refunds" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Политика за връщане</a>
+              <a href="#/legal/cookies" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Бисквитки</a>
             </div>
           </div>
         </div>
         <div className="max-w-[1200px] mx-auto mt-12 pt-8 border-t border-[#2e2839] text-center md:text-left">
           <p className="text-slate-600 text-xs">
-            © 2023 AstroMind AI. Всички права запазени. Само за развлекателни цели и самоанализ.
+            © {new Date().getFullYear()} AstroMind. Всички права запазени. Съдържанието е за самоанализ и развлечение и не е медицински, финансов или правен съвет.
           </p>
         </div>
       </footer>
@@ -711,6 +730,16 @@ const Home = () => {
                 <p className="text-xs text-gray-400 -mt-1">
                   Поне 10 символа, с поне една буква и една цифра.
                 </p>
+              )}
+              {!isLogin && (
+                <label className="flex items-start gap-2 text-xs text-gray-300">
+                  <input type="checkbox" required checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} className="mt-0.5 accent-purple-600" />
+                  <span>
+                    Навършил/а съм 18 години и приемам{' '}
+                    <a href="#/legal/terms" target="_blank" rel="noopener noreferrer" className="text-purple-300 underline">Общите условия</a> и{' '}
+                    <a href="#/legal/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-300 underline">Политиката за поверителност</a>.
+                  </span>
+                </label>
               )}
               {isLogin && (
                 <div className="text-right -mt-1">
