@@ -120,6 +120,9 @@ export const REPORT_TYPE_LABELS = {
 
 export const formatDate = (iso) => {
   if (!iso) return '';
-  const d = new Date(iso.endsWith('Z') || iso.includes('+') ? iso : `${iso}Z`);
+  // Само дата (YYYY-MM-DD) или UTC време от сървъра без зона
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? new Date(`${iso}T12:00:00`)
+    : new Date(iso.endsWith('Z') || iso.includes('+') ? iso : `${iso}Z`);
   return d.toLocaleDateString('bg-BG', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };

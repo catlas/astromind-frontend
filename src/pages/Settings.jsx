@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifySession, clearSessionAndRedirect, getApiBaseUrl } from '../utils/auth';
 import axios from 'axios';
+import { api, apiErrorMessage, fetchProfiles } from '../utils/api';
 
 const TABS = [
   { id: 'account', label: 'Акаунт', icon: 'manage_accounts' },
   { id: 'preferences', label: 'Предпочитания', icon: 'tune' },
   { id: 'notifications', label: 'Известия', icon: 'notifications' },
+  { id: 'memory', label: 'AI памет', icon: 'psychology' },
   { id: 'privacy', label: 'Поверителност', icon: 'shield' },
   { id: 'subscription', label: 'Абонамент', icon: 'workspace_premium' },
 ];
@@ -48,6 +50,134 @@ const SectionCard = ({ title, description, icon, children }) => (
     <div className="p-6">{children}</div>
   </div>
 );
+
+// Контролирана AI памет: потребителят сам пише, вижда и трие какво знае AI
+const MemoryPanel = () => {
+  const [data, setData] = useState(null);
+  const [profiles, setProfiles] = useState([]);
+  const [text, setText] = useState('');
+  const [profileName, setProfileName] = useState('');
+  const [previewFor, setPreviewFor] = useState('');
+  const [msg, setMsg] = useState(null);
+
+  const load = async (forProfile = previewFor) => {
+    try {
+      const r = await api.get('/memory', { params: forProfile ? { profile_name: forProfile } : {} });
+      setData(r.data);
+    } catch (err) {
+      setMsg({ error: true, text: apiErrorMessage(err, 'Паметта не можа да се зареди.') });
+    }
+  };
+
+  useEffect(() => {
+    load('');
+    fetchProfiles().then(setProfiles).catch(() => {});
+  }, []);
+
+  const flash = (m) => { setMsg(m); setTimeout(() => setMsg(null), 4000); };
+
+  const add = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/memory', { text, profile_name: profileName || null });
+      setText('');
+      await load();
+    } catch (err) {
+      flash({ error: true, text: apiErrorMessage(err, 'Бележката не беше запазена.') });
+    }
+  };
+
+  const remove = async (id) => {
+    await api.delete(`/memory/${id}`).catch(() => {});
+    load();
+  };
+
+  const toggle = async (enabled) => {
+    await api.put('/memory/settings', { enabled });
+    load();
+  };
+
+  const clearAll = async () => {
+    if (!window.confirm('Да изтрием ли всички бележки от паметта?')) return;
+    await api.delete('/memory');
+    load();
+  };
+
+  if (!data) return <p className="text-[#a69db9] text-sm">Зареждане…</p>;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <SectionCard title="AI памет" description="Какво искате AI да знае за вас при следващите анализи" icon="psychology">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <p className="text-white text-sm font-medium">Използвай паметта в анализите</p>
+            <p className="text-xs text-[#a69db9]">Когато е изключено, AI не вижда нито бележките, нито предишните ви анализи.</p>
+          </div>
+          <Toggle checked={data.enabled} onChange={toggle} />
+        </div>
+        <p className="text-xs text-[#a69db9]">
+          AI помни само това, което напишете тук, и заглавията на последните ви три анализа за същия профил. Нищо не се добавя
+          автоматично. Можете да редактирате или изтриете всичко по всяко време.
+        </p>
+      </SectionCard>
+
+      <SectionCard title="Бележки" description="Кратки факти за вас или за хората в профилите ви" icon="edit_note">
+        <form onSubmit={add} className="flex flex-col gap-3 mb-5">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={500}
+            rows={2}
+            placeholder="Напр.: Работя като учител и обмислям смяна на професията."
+            className="w-full bg-[#161022] border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-[#5211d4]"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <select value={profileName} onChange={(e) => setProfileName(e.target.value)}
+              className="bg-[#161022] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
+              <option value="">За всички анализи</option>
+              {profiles.map((p) => <option key={p.id} value={p.name}>Само за {p.name}</option>)}
+            </select>
+            <button disabled={!text.trim()} className="px-5 py-2 rounded-xl bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-sm font-bold disabled:opacity-50">
+              Добави
+            </button>
+          </div>
+        </form>
+        {data.notes.length === 0 ? (
+          <p className="text-sm text-[#a69db9]">Още няма бележки.</p>
+        ) : (
+          <ul className="divide-y divide-slate-800">
+            {data.notes.map((n) => (
+              <li key={n.id} className="flex items-start gap-3 py-3">
+                <div className="flex-1">
+                  <p className="text-sm text-white">{n.text}</p>
+                  <p className="text-xs text-[#a69db9]">{n.profile_name ? `Само за ${n.profile_name}` : 'За всички анализи'}</p>
+                </div>
+                <button onClick={() => remove(n.id)} className="p-1 text-slate-500 hover:text-red-400" title="Изтрий">
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {data.notes.length > 0 && (
+          <button onClick={clearAll} className="mt-4 text-xs text-red-400 hover:text-red-300">Изтрий всички бележки</button>
+        )}
+        {msg && <p className={`mt-3 text-sm ${msg.error ? 'text-red-400' : 'text-green-400'}`}>{msg.text}</p>}
+      </SectionCard>
+
+      <SectionCard title="Какво точно вижда AI" description="Текстът, който се добавя към следващия анализ" icon="visibility">
+        <select value={previewFor} onChange={(e) => { setPreviewFor(e.target.value); load(e.target.value); }}
+          className="mb-3 bg-[#161022] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
+          <option value="">Анализ без избран профил</option>
+          {profiles.map((p) => <option key={p.id} value={p.name}>Анализ за {p.name}</option>)}
+        </select>
+        <pre className="whitespace-pre-wrap text-xs text-slate-300 bg-[#161022] border border-slate-800 rounded-xl p-4 min-h-[60px]">
+          {data.preview || 'Нищо — AI няма да получи допълнителен контекст.'}
+        </pre>
+      </SectionCard>
+    </div>
+  );
+};
 
 const InputField = ({ label, type = 'text', value, onChange, placeholder, disabled, hint }) => (
   <div className="flex flex-col gap-1.5">
@@ -618,6 +748,8 @@ export default function Settings() {
           </div>
         );
 
+      case 'memory':
+        return <MemoryPanel />;
       case 'privacy':
         return (
           <div className="flex flex-col gap-6">

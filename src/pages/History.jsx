@@ -17,6 +17,8 @@ export default function History() {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [viewLoading, setViewLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('table');
+  const [timeline, setTimeline] = useState(null);
 
   const loadReports = async () => {
     try {
@@ -61,6 +63,14 @@ export default function History() {
     loadUser();
     return () => { isMounted = false; };
   }, [navigate]);
+
+  useEffect(() => {
+    if (viewMode !== 'timeline' || !user) return;
+    setTimeline(null);
+    api.get('/timeline', { params: filterProfile !== 'all' ? { profile: filterProfile } : {} })
+      .then((r) => setTimeline(r.data))
+      .catch(() => setTimeline({ groups: [], profiles: [] }));
+  }, [viewMode, filterProfile, user, history.length]);
 
   const typeIcons = {
     general: 'auto_awesome', health: 'favorite_border', career: 'work',
@@ -379,6 +389,60 @@ export default function History() {
             </button>
           </div>
 
+          {/* Изглед: таблица или времева линия */}
+          <div className="flex gap-2 mb-4">
+            {[['table', 'Таблица', 'table_rows'], ['timeline', 'Времева линия', 'timeline']].map(([id, label, icon]) => (
+              <button
+                key={id}
+                onClick={() => setViewMode(id)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border transition-colors ${viewMode === id ? 'bg-[#5211d4] border-[#5211d4] text-white' : 'border-[#302240] text-[#d4c8ed] hover:bg-white/5'}`}
+              >
+                <span className="material-symbols-outlined text-[18px]">{icon}</span>{label}
+              </button>
+            ))}
+          </div>
+
+          {viewMode === 'timeline' ? (
+            <div className="relative pl-6">
+              <div className="absolute left-2 top-1 bottom-1 w-px bg-[#302240]" />
+              {!timeline ? (
+                <p className="text-sm text-[#d4c8ed]">Зареждане…</p>
+              ) : timeline.groups.length === 0 ? (
+                <p className="text-sm text-[#d4c8ed]">Още няма отчети за времевата линия.</p>
+              ) : timeline.groups.map((g) => (
+                <div key={g.month} className="mb-8">
+                  <div className="flex items-center gap-2 mb-3 -ml-6">
+                    <span className="w-4 h-4 rounded-full bg-[#7c5dfa] border-4 border-[#161022]" />
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">{g.label}</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {g.reports.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => openReport({ ...r, date: formatDate(r.created_at) })}
+                        className="w-full text-left bg-[#201428] rounded-xl border border-[#302240] px-4 py-3 hover:border-[#7c5dfa] transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="material-symbols-outlined" style={{ color: typeColors[r.type] || '#a69db9' }}>{typeIcons[r.type] || 'auto_awesome'}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{r.label}</p>
+                            <p className="text-xs text-[#b8aed0]">
+                              {formatDate(r.created_at)}{r.profile ? ` · ${r.profile}` : ''}
+                              {r.covers ? ` · обхваща ${formatDate(r.covers.from)} – ${formatDate(r.covers.to)}` : ''}
+                            </p>
+                          </div>
+                          {r.memory_used && (
+                            <span title="В анализа е използвана AI паметта" className="material-symbols-outlined text-[#a78bfa] text-[18px]">psychology</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+          <>
           {/* Table */}
           <div className="bg-[#201428] rounded-xl border border-[#302240] overflow-hidden">
             <table className="w-full">
@@ -492,6 +556,8 @@ export default function History() {
                 </button>
               </div>
             </div>
+          )}
+          </>
           )}
         </div>
       </div>
