@@ -1,28 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Loader2, Sparkles, Calendar, Clock, MapPin, MessageSquare, User, Map, TrendingUp, Heart, Activity, Infinity } from 'lucide-react';
+import { Loader2, Sparkles, Calendar, Clock, MessageSquare, User, TrendingUp, Heart, Activity, Infinity } from 'lucide-react';
 import AstroChart from '../components/AstroChart';
 import DownloadPDFButton from '../components/DownloadPDFButton';
 import ChartSummary from '../components/ChartSummary';
-import { bulgarianCities } from '../utils/bulgarianCities';
+import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
+import { emptyPlace, normalizePlace, placeFromParts, placeFromProfile, placeLabel } from '../utils/birthPlace';
 import { clearSessionAndRedirect, getApiBaseUrl, verifySession } from '../utils/auth';
 import { api, fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
 import DOMPurify from 'dompurify';
+
+// Менюто на мобилната странична лента (на компютър бутоните са изписани директно по-долу)
+const NAV_ITEMS = [
+  { path: '/dashboard', icon: 'dashboard', label: 'Табло' },
+  { path: '/generate-report', icon: 'auto_awesome', label: 'Генерирай хороскоп' },
+  { path: '/profiles', icon: 'groups', label: 'Профили' },
+  { path: '/history', icon: 'history', label: 'История' },
+  { path: '/settings', icon: 'settings', label: 'Настройки', separated: true },
+  { path: '/buy-coins', icon: 'credit_card', label: 'Монети' },
+];
 
 const GenerateReport = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Профил: '' = ръчно въвеждане, иначе id на избран профил от „Профили“
+  const [profileChoice, setProfileChoice] = useState('');
   const [name, setName] = useState('');
-  const [selectedCity, setSelectedCity] = useState('');
+  const [birthPlace, setBirthPlace] = useState(emptyPlace());
   const [formData, setFormData] = useState({
     date: '',
     time: '',
-    lat: '',
-    lon: '',
     question: '',
   });
 
@@ -36,14 +48,14 @@ const GenerateReport = () => {
   const [reportType, setReportType] = useState('general');
 
   const [enablePartner, setEnablePartner] = useState(false);
+  // Партньор: '' = ръчно въвеждане, иначе id на избран профил
+  const [partnerChoice, setPartnerChoice] = useState('');
   const [partnerData, setPartnerData] = useState({
     partner_name: '',
     partner_date: '',
     partner_time: '',
-    partner_lat: '',
-    partner_lon: '',
   });
-  const [selectedPartnerCity, setSelectedPartnerCity] = useState('');
+  const [partnerPlace, setPartnerPlace] = useState(emptyPlace());
 
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -52,12 +64,6 @@ const GenerateReport = () => {
   const [monthlyResults, setMonthlyResults] = useState([]); // For chunked PDF generation
   const [savedProfiles, setSavedProfiles] = useState([]);
   const [searchParams] = useSearchParams();
-
-  // ?profile=Име идва от onboarding или от страницата с профили
-  useEffect(() => {
-    const preset = searchParams.get('profile');
-    if (preset) setName(preset);
-  }, [searchParams]);
   const [billingConfig, setBillingConfig] = useState(null);
   const [crisisHtml, setCrisisHtml] = useState('');
 
@@ -112,99 +118,148 @@ const GenerateReport = () => {
     };
   }, [navigate]);
 
-  // Профилите се пазят на сървъра; настройките на формата са в profile.settings
-  const loadProfile = (profileName) => {
-    if (!profileName) return;
-    const profile = savedProfiles.find((p) => p.name === profileName.trim());
-    if (!profile) return;
+  const selectedProfile = savedProfiles.find((p) => String(p.id) === profileChoice) || null;
+  const partnerProfile = savedProfiles.find((p) => String(p.id) === partnerChoice) || null;
+
+  const emptyPartnerData = { partner_name: '', partner_date: '', partner_time: '' };
+
+  // Избор на партньор от „Профили“: данните му се попълват и остават редактируеми
+  const applyPartnerProfile = (profile) => {
+    setPartnerChoice(String(profile.id));
+    setPartnerData({
+      partner_name: profile.name,
+      partner_date: profile.birth_date || '',
+      partner_time: profile.birth_time || '',
+    });
+    setPartnerPlace(placeFromProfile(profile));
+  };
+
+  // Партньорът от запазените настройки на профила. Ако името му съвпада с профил,
+  // актуалните данни на този профил са с предимство пред запазения запис.
+  const restorePartner = (settings) => {
+    const saved = settings.partnerData || {};
+    const matched = saved.partner_name ? savedProfiles.find((p) => p.name === saved.partner_name) : null;
+    if (settings.enablePartner && matched) {
+      applyPartnerProfile(matched);
+      return;
+    }
+    setPartnerChoice('');
+    setPartnerData({
+      partner_name: saved.partner_name || '',
+      partner_date: saved.partner_date || '',
+      partner_time: saved.partner_time || '',
+    });
+    // Новият формат пази partnerPlace; старият - градът и координатите отделно
+    setPartnerPlace(
+      settings.partnerPlace
+        ? normalizePlace(settings.partnerPlace)
+        : placeFromParts(settings.selectedPartnerCity, saved.partner_lat, saved.partner_lon)
+    );
+  };
+
+  // Избор на профил: данните за раждане идват от профила, а настройките на формата
+  // (въпрос, транзити, партньор) - от profile.settings
+  const applyProfile = (profile) => {
     const settings = profile.settings || {};
+    setProfileChoice(String(profile.id));
+    setName(profile.name);
     setFormData({
       date: profile.birth_date || '',
       time: profile.birth_time || '',
-      lat: profile.lat != null ? String(profile.lat) : '',
-      lon: profile.lon != null ? String(profile.lon) : '',
       question: settings.question || '',
     });
-    setSelectedCity(profile.birth_place || settings.selectedCity || '');
-    if (settings.transitData) {
-      setTransitData(settings.transitData);
-      setEnableTransit(settings.enableTransit || false);
-    }
-    if (settings.partnerData) {
-      setPartnerData(settings.partnerData);
-      setSelectedPartnerCity(settings.selectedPartnerCity || '');
-      setEnablePartner(settings.enablePartner || false);
-    }
+    setBirthPlace(placeFromProfile(profile));
+    setEnableTransit(Boolean(settings.enableTransit));
+    if (settings.transitData) setTransitData(settings.transitData);
+    setEnablePartner(Boolean(settings.enablePartner));
+    restorePartner(settings);
   };
 
-  const saveProfile = async (profileName, data) => {
-    if (!profileName) return;
+  const handleProfileChange = (e) => {
+    const value = e.target.value;
+    setProfileChoice(value);
+    if (!value) {
+      // Ръчно въвеждане: започваме с празни данни за раждане
+      setName('');
+      setFormData((prev) => ({ ...prev, date: '', time: '' }));
+      setBirthPlace(emptyPlace());
+      return;
+    }
+    const profile = savedProfiles.find((p) => String(p.id) === value);
+    if (profile) applyProfile(profile);
+  };
+
+  const handlePartnerProfileChange = (e) => {
+    const value = e.target.value;
+    setPartnerChoice(value);
+    if (!value) {
+      setPartnerData(emptyPartnerData);
+      setPartnerPlace(emptyPlace());
+      return;
+    }
+    const profile = savedProfiles.find((p) => String(p.id) === value);
+    if (profile) applyPartnerProfile(profile);
+  };
+
+  // ?profile=Име идва от onboarding: профилът се избира веднага щом профилите се заредят
+  const presetApplied = useRef(false);
+  useEffect(() => {
+    const preset = searchParams.get('profile');
+    if (!preset || presetApplied.current || savedProfiles.length === 0) return;
+    const profile = savedProfiles.find((p) => p.name === preset);
+    if (profile) {
+      presetApplied.current = true;
+      applyProfile(profile);
+    }
+  }, [savedProfiles, searchParams]);
+
+  // След успешен анализ запомняме настройките на формата към избрания профил.
+  // Данните за раждане на съществуващ профил не се променят оттук (редактират се в „Профили“).
+  // Ново име, въведено ръчно, се запазва като нов профил.
+  const persistProfile = async (coords) => {
+    const settings = {
+      question: formData.question || '',
+      transitData,
+      enableTransit,
+      partnerData,
+      partnerPlace,
+      enablePartner,
+    };
     try {
-      const existing = savedProfiles.find((p) => p.name === profileName.trim());
-      await upsertProfile({
-        name: profileName.trim(),
-        relation: existing?.relation || 'self',
-        gender: existing?.gender || null,
-        birth_date: data.date,
-        birth_time: data.time || '',
-        unknown_time: !data.time,
-        birth_place: selectedCity || existing?.birth_place || '',
-        lat: data.lat === '' ? null : Number(data.lat),
-        lon: data.lon === '' ? null : Number(data.lon),
-        settings: {
-          question: data.question || '',
-          selectedCity,
-          transitData,
-          enableTransit,
-          partnerData,
-          selectedPartnerCity,
-          enablePartner,
-        },
-      });
+      if (selectedProfile) {
+        await upsertProfile({
+          name: selectedProfile.name,
+          relation: selectedProfile.relation,
+          gender: selectedProfile.gender,
+          birth_date: selectedProfile.birth_date,
+          birth_time: selectedProfile.birth_time || '',
+          unknown_time: Boolean(selectedProfile.unknown_time),
+          birth_place: selectedProfile.birth_place || '',
+          lat: selectedProfile.lat,
+          lon: selectedProfile.lon,
+          settings,
+        });
+      } else if (name.trim() && !savedProfiles.some((p) => p.name === name.trim())) {
+        await upsertProfile({
+          name: name.trim(),
+          relation: 'self',
+          gender: null,
+          birth_date: formData.date,
+          birth_time: formData.time || '',
+          unknown_time: !formData.time,
+          birth_place: placeLabel(birthPlace),
+          lat: coords.lat,
+          lon: coords.lon,
+          settings,
+        });
+      } else {
+        return;
+      }
       refreshSavedProfiles();
     } catch (err) {
       console.error('Грешка при запазване на профил:', err);
     }
   };
-
-  // Автоматично зареждане на профил при промяна на името
-  useEffect(() => {
-    if (name) {
-      const timeoutId = setTimeout(() => {
-        loadProfile(name);
-      }, 500);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [name, savedProfiles]);
-
-  // Автоматично попълване на координати при избор на град
-  useEffect(() => {
-    if (selectedCity) {
-      const city = bulgarianCities.find(c => c.name === selectedCity);
-      if (city) {
-        setFormData(prev => ({
-          ...prev,
-          lat: city.lat.toString(),
-          lon: city.lon.toString(),
-        }));
-      }
-    }
-  }, [selectedCity]);
-
-  // Автоматично попълване на координати при избор на град за партньор
-  useEffect(() => {
-    if (selectedPartnerCity) {
-      const city = bulgarianCities.find(c => c.name === selectedPartnerCity);
-      if (city) {
-        setPartnerData(prev => ({
-          ...prev,
-          partner_lat: city.lat.toString(),
-          partner_lon: city.lon.toString(),
-        }));
-      }
-    }
-  }, [selectedPartnerCity]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -212,10 +267,6 @@ const GenerateReport = () => {
       ...prev,
       [name]: value
     }));
-  };
-
-  const handleCityChange = (e) => {
-    setSelectedCity(e.target.value);
   };
 
   const handlePartnerChange = (e) => {
@@ -393,12 +444,12 @@ const GenerateReport = () => {
 
     try {
       // Валидация
-      if (!formData.date || !formData.time || !formData.lat || !formData.lon) {
+      if (!formData.date || !formData.time || !birthPlace.lat || !birthPlace.lon) {
         throw new Error('Моля попълнете всички задължителни полета');
       }
 
-      const lat = parseFloat(formData.lat);
-      const lon = parseFloat(formData.lon);
+      const lat = parseFloat(birthPlace.lat);
+      const lon = parseFloat(birthPlace.lon);
 
       if (isNaN(lat) || lat < -90 || lat > 90) {
         throw new Error('Географската ширина трябва да е между -90 и 90');
@@ -410,7 +461,7 @@ const GenerateReport = () => {
 
       // Подготовка на данните за заявката
       const requestData = {
-        name: name || undefined,
+        name: name.trim() || undefined,
         date: formData.date,
         time: formData.time,
         lat: lat,
@@ -445,12 +496,12 @@ const GenerateReport = () => {
       }
 
       // Добавяне на partner данни, ако са активирани
-      if (enablePartner && partnerData.partner_date && partnerData.partner_time && partnerData.partner_lat && partnerData.partner_lon) {
-        const partnerLat = parseFloat(partnerData.partner_lat);
-        const partnerLon = parseFloat(partnerData.partner_lon);
+      if (enablePartner && partnerData.partner_date && partnerData.partner_time && partnerPlace.lat && partnerPlace.lon) {
+        const partnerLat = parseFloat(partnerPlace.lat);
+        const partnerLon = parseFloat(partnerPlace.lon);
         
         if (!isNaN(partnerLat) && !isNaN(partnerLon)) {
-          requestData.partner_name = partnerData.partner_name || undefined;
+          requestData.partner_name = partnerData.partner_name.trim() || undefined;
           requestData.partner_date = partnerData.partner_date;
           requestData.partner_time = partnerData.partner_time;
           requestData.partner_lat = partnerLat;
@@ -486,16 +537,8 @@ const GenerateReport = () => {
         }
       }
       
-      // Запазване на профила на сървъра
-      if (name) {
-        saveProfile(name, {
-          date: formData.date,
-          time: formData.time,
-          lat: formData.lat,
-          lon: formData.lon,
-          question: formData.question,
-        });
-      }
+      // Запомняме настройките към профила (или запазваме нов профил) на сървъра
+      persistProfile({ lat, lon });
     } catch (err) {
       console.error('Грешка:', err);
 
@@ -547,11 +590,17 @@ const GenerateReport = () => {
             <span className="material-symbols-outlined">auto_awesome</span>
             <span className="text-sm font-medium">Генерирай хороскоп</span>
           </button>
-          <button className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all">
+          <button
+            onClick={() => navigate('/profiles')}
+            className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
+          >
             <span className="material-symbols-outlined">groups</span>
             <span className="text-sm font-medium">Профили</span>
           </button>
-          <button className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all">
+          <button
+            onClick={() => navigate('/history')}
+            className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
+          >
             <span className="material-symbols-outlined">history</span>
             <span className="text-sm font-medium">История</span>
           </button>
@@ -628,6 +677,56 @@ const GenerateReport = () => {
         </div>
       </div>
 
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 z-30 md:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+          <div className="fixed inset-y-0 left-0 w-64 bg-[#131118] border-r border-slate-800 z-40 md:hidden flex flex-col">
+            <div className="p-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-[#5211d4]/20 p-2 rounded-full">
+                  <span className="material-symbols-outlined text-[#5211d4]" style={{ fontSize: '28px' }}>nightlight_round</span>
+                </div>
+                <div className="flex flex-col">
+                  <h1 className="text-lg font-bold leading-tight text-white">AstroMind</h1>
+                  <p className="text-[#a69db9] text-xs font-medium">Cosmic Insights</p>
+                </div>
+              </div>
+              <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-white">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2 px-4 py-4 grow">
+              {NAV_ITEMS.map((item) => (
+                <React.Fragment key={item.path}>
+                  {item.separated && <div className="h-px bg-slate-800 my-2"></div>}
+                  <button
+                    onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
+                    className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-all ${
+                      item.path === '/generate-report'
+                        ? 'bg-[#5211d4] text-white shadow-lg shadow-[#5211d4]/25'
+                        : 'text-[#a69db9] hover:bg-white/5'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined">{item.icon}</span>
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </button>
+                </React.Fragment>
+              ))}
+            </div>
+
+            <div className="p-4 border-t border-slate-800">
+              <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
+              <p className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</p>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Main Content */}
       <div className="flex flex-col flex-1 h-full overflow-hidden bg-[#131118]">
         {/* Mobile Header */}
@@ -636,7 +735,7 @@ const GenerateReport = () => {
             <span className="material-symbols-outlined text-[#5211d4]">nightlight_round</span>
             <span className="font-bold text-white">AstroMind</span>
           </div>
-          <button className="p-2 text-white">
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-white">
             <span className="material-symbols-outlined">menu</span>
           </button>
         </div>
@@ -654,44 +753,48 @@ const GenerateReport = () => {
               </h2>
               
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Name Field */}
+                {/* Profile Selector */}
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-300">
                     <User className="w-4 h-4 inline mr-1" />
-                    Име (за запазване на профил)
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    list="saved-profiles"
-                    placeholder="Въведете име за запазване на данните..."
-                    className="w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
-                  />
-                  <datalist id="saved-profiles">
-                    {savedProfiles.map((p) => <option key={p.id} value={p.name} />)}
-                  </datalist>
-                </div>
-
-                {/* City Selector */}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-300">
-                    <Map className="w-4 h-4 inline mr-1" />
-                    Град на раждане
+                    Профил
                   </label>
                   <select
-                    value={selectedCity}
-                    onChange={handleCityChange}
+                    value={selectedProfile ? profileChoice : ''}
+                    onChange={handleProfileChange}
                     className="w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
                   >
-                    <option value="">Изберете град...</option>
-                    {bulgarianCities.map((city) => (
-                      <option key={city.name} value={city.name}>
-                        {city.name}
+                    <option value="">Ръчно въвеждане (без профил)</option>
+                    {savedProfiles.map((p) => (
+                      <option key={p.id} value={String(p.id)}>
+                        {p.name}
                       </option>
                     ))}
                   </select>
+                  {!selectedProfile && (
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      maxLength={100}
+                      placeholder="Име (по желание; ще се запази като нов профил)"
+                      className="mt-2 w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                    />
+                  )}
+                  <p className="mt-1 text-xs text-gray-400">
+                    {selectedProfile
+                      ? 'Данните са от профила. Промените в полетата важат само за този анализ; профилът се редактира в „Профили“.'
+                      : savedProfiles.length === 0
+                        ? 'Още нямате профили. Създайте ги в „Профили“ или въведете данните ръчно.'
+                        : 'Изберете профил или въведете данните ръчно.'}{' '}
+                    <button type="button" onClick={() => navigate('/profiles')} className="underline text-purple-300 hover:text-purple-200">
+                      Към Профили
+                    </button>
+                  </p>
                 </div>
+
+                {/* Birth place: град от списъка или „Друг“ (търсене с AI или ръчно) */}
+                <BirthPlaceSelect key={`person-${profileChoice}`} value={birthPlace} onChange={setBirthPlace} variant="purple" label="Град на раждане" />
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -723,49 +826,14 @@ const GenerateReport = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-gray-300">
-                      <MapPin className="w-4 h-4 inline mr-1" />
-                      Ширина (Lat) <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="lat"
-                      value={formData.lat}
-                      onChange={handleChange}
-                      required
-                      step="0.0001"
-                      min="-90"
-                      max="90"
-                      placeholder="42.6977"
-                      className={`w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white ${
-                        selectedCity ? 'opacity-75' : ''
-                      }`}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-gray-300">
-                      <MapPin className="w-4 h-4 inline mr-1" />
-                      Дължина (Lon) <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="lon"
-                      value={formData.lon}
-                      onChange={handleChange}
-                      required
-                      step="0.0001"
-                      min="-180"
-                      max="180"
-                      placeholder="23.3219"
-                      className={`w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white ${
-                        selectedCity ? 'opacity-75' : ''
-                      }`}
-                    />
-                  </div>
-                </div>
+                {/* Ширина и дължина: попълват се от града или от AI и могат да се коригират */}
+                <BirthCoordinates
+                  value={birthPlace}
+                  onChange={setBirthPlace}
+                  variant="purple"
+                  required
+                  names={{ lat: 'lat', lon: 'lon' }}
+                />
 
                 {/* Dynamic Forecast Mode Section */}
                 <div className="border-t border-blue-800/30 pt-4 bg-blue-950/10 rounded-lg p-4 border-2 border-blue-800/20">
@@ -898,41 +966,39 @@ const GenerateReport = () => {
 
                   {enablePartner && (
                     <div className="space-y-4 pl-6 border-l-2 border-pink-800/30">
-                      {/* Partner Name */}
+                      {/* Partner: избор от „Профили“ или ръчно въвеждане */}
                       <div>
                         <label className="block text-sm font-medium mb-2 text-gray-300">
                           <User className="w-4 h-4 inline mr-1" />
                           Име на партньора
                         </label>
-                        <input
-                          type="text"
-                          name="partner_name"
-                          value={partnerData.partner_name}
-                          onChange={handlePartnerChange}
-                          placeholder="Име на партньора..."
-                          className="w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white"
-                        />
-                      </div>
-
-                      {/* Partner City */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2 text-gray-300">
-                          <Map className="w-4 h-4 inline mr-1" />
-                          Град на раждане на партньора
-                        </label>
                         <select
-                          value={selectedPartnerCity}
-                          onChange={(e) => setSelectedPartnerCity(e.target.value)}
+                          value={partnerProfile ? partnerChoice : ''}
+                          onChange={handlePartnerProfileChange}
                           className="w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white"
                         >
-                          <option value="">Изберете град...</option>
-                          {bulgarianCities.map((city) => (
-                            <option key={city.name} value={city.name}>
-                              {city.name}
+                          <option value="">Ръчно въвеждане (без профил)</option>
+                          {savedProfiles.map((p) => (
+                            <option key={p.id} value={String(p.id)}>
+                              {p.name}
                             </option>
                           ))}
                         </select>
+                        {!partnerProfile && (
+                          <input
+                            type="text"
+                            name="partner_name"
+                            value={partnerData.partner_name}
+                            onChange={handlePartnerChange}
+                            maxLength={100}
+                            placeholder="Име на партньора..."
+                            className="mt-2 w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white"
+                          />
+                        )}
                       </div>
+
+                      {/* Partner city */}
+                      <BirthPlaceSelect key={`partner-${partnerChoice}`} value={partnerPlace} onChange={setPartnerPlace} variant="pink" label="Град на раждане на партньора" />
 
                       {/* Partner Date and Time */}
                       <div className="grid grid-cols-2 gap-4">
@@ -966,49 +1032,13 @@ const GenerateReport = () => {
                       </div>
 
                       {/* Partner Coordinates */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-2 text-gray-300">
-                            <MapPin className="w-4 h-4 inline mr-1" />
-                            Ширина (Lat) <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="number"
-                            name="partner_lat"
-                            value={partnerData.partner_lat}
-                            onChange={handlePartnerChange}
-                            required={enablePartner}
-                            step="0.0001"
-                            min="-90"
-                            max="90"
-                            placeholder="42.6977"
-                            className={`w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white ${
-                              selectedPartnerCity ? 'opacity-75' : ''
-                            }`}
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium mb-2 text-gray-300">
-                            <MapPin className="w-4 h-4 inline mr-1" />
-                            Дължина (Lon) <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="number"
-                            name="partner_lon"
-                            value={partnerData.partner_lon}
-                            onChange={handlePartnerChange}
-                            required={enablePartner}
-                            step="0.0001"
-                            min="-180"
-                            max="180"
-                            placeholder="23.3219"
-                            className={`w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white ${
-                              selectedPartnerCity ? 'opacity-75' : ''
-                            }`}
-                          />
-                        </div>
-                      </div>
+                      <BirthCoordinates
+                        value={partnerPlace}
+                        onChange={setPartnerPlace}
+                        variant="pink"
+                        required
+                        names={{ lat: 'partner_lat', lon: 'partner_lon' }}
+                      />
                     </div>
                   )}
                 </div>
@@ -1205,6 +1235,8 @@ const GenerateReport = () => {
                 {/* Download PDF Button */}
                 <DownloadPDFButton 
                   fileName={`Astrology_Report_${name || 'Chart'}_${new Date().toISOString().split('T')[0]}.pdf`}
+                  userName={name.trim()}
+                  birthCity={placeLabel(birthPlace)}
                   natalChart={result.natal_chart}
                   natalAspects={result.natal_aspects || null}
                   monthlyResults={monthlyResults}

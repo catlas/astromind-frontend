@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
 import { api, apiErrorMessage, fetchProfiles, migrateLocalData } from '../utils/api';
+import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
+import { emptyPlace, parseCoordinates, placeFromProfile, placeLabel } from '../utils/birthPlace';
 
 const relationOptions = [
   { value: 'self', label: 'Аз' },
@@ -36,10 +38,9 @@ const Profiles = () => {
     birth_date: '',
     birth_time: '',
     unknown_time: false,
-    birth_place: '',
-    lat: '',
-    lon: '',
   });
+  // Място на раждане: град от списъка или „Друг“ (с търсене с AI), плюс ширина и дължина
+  const [place, setPlace] = useState(emptyPlace());
 
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -90,10 +91,8 @@ const Profiles = () => {
       birth_date: profile.birth_date,
       birth_time: profile.birth_time || '',
       unknown_time: profile.unknown_time,
-      birth_place: profile.birth_place || '',
-      lat: profile.lat ?? '',
-      lon: profile.lon ?? '',
     });
+    setPlace(placeFromProfile(profile));
   };
 
   const handleDelete = async (id) => {
@@ -116,13 +115,18 @@ const Profiles = () => {
       birth_date: '',
       birth_time: '',
       unknown_time: false,
-      birth_place: '',
-      lat: '',
-      lon: '',
     });
+    setPlace(emptyPlace());
   };
 
   const handleSave = async () => {
+    // Без координати профилът не може да се ползва за анализ
+    const coords = parseCoordinates(place);
+    if (coords.error) {
+      setSaveError(coords.error);
+      return;
+    }
+
     const existing = editingId ? profiles.find((p) => p.id === editingId) : null;
     const body = {
       name: form.name,
@@ -131,9 +135,9 @@ const Profiles = () => {
       birth_date: form.birth_date,
       birth_time: form.unknown_time ? '' : form.birth_time,
       unknown_time: form.unknown_time,
-      birth_place: form.birth_place,
-      lat: form.lat === '' ? null : Number(form.lat),
-      lon: form.lon === '' ? null : Number(form.lon),
+      birth_place: placeLabel(place),
+      lat: coords.lat,
+      lon: coords.lon,
       settings: existing?.settings,
     };
     setSaving(true);
@@ -155,6 +159,12 @@ const Profiles = () => {
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Старата грешка за координатите се маха, щом потребителят промени мястото
+  const handlePlaceChange = (next) => {
+    setSaveError('');
+    setPlace(next);
   };
 
   if (!user) return null;
@@ -593,29 +603,18 @@ const Profiles = () => {
                     />
                   </div>
 
-                  {/* Birth Place + GPS */}
+                  {/* Birth Place: град от списъка или „Друг“ с търсене с AI */}
+                  <div className="mb-4">
+                    <BirthPlaceSelect key={editingId ?? 'new'} value={place} onChange={handlePlaceChange} variant="profile" label="Място на раждане" />
+                  </div>
+
+                  {/* Latitude / Longitude: винаги видими и редактируеми */}
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-[#a69db9] mb-1.5">Място на раждане</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={form.birth_place}
-                        onChange={(e) => handleChange('birth_place', e.target.value)}
-                        placeholder="Напр. София"
-                        className="flex-1 px-3 py-2.5 rounded-lg bg-[#131118] border border-slate-700 text-white text-sm placeholder-slate-500 focus:border-[#5211d4] focus:outline-none transition-colors"
-                      />
-                      <button
-                        onClick={() => { /* TODO: GPS */ }}
-                        className="px-3 py-2.5 rounded-lg bg-white/5 border border-slate-700 text-[#a69db9] hover:text-[#5211d4] hover:border-[#5211d4] transition-all"
-                        title="GPS координати"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">my_location</span>
-                      </button>
-                    </div>
+                    <BirthCoordinates value={place} onChange={handlePlaceChange} variant="profile" required />
                   </div>
 
                   {saveError && (
-                    <p className="text-sm text-red-400">{saveError}</p>
+                    <p className="text-sm text-red-400 mb-3">{saveError}</p>
                   )}
 
                   {/* Action Buttons */}

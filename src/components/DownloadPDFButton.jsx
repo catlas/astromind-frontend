@@ -48,7 +48,9 @@ const DownloadPDFButton = ({
   natalChart = null, 
   natalAspects = null,
   monthlyResults = [], // for dynamic forecast (chunked monthly analysis)
-  staticInterpretation = null // for static mode (single interpretation)
+  staticInterpretation = null, // for static mode (single interpretation)
+  userName: userNameProp, // име на човека; ако е подадено, не се търси в страницата
+  birthCity: birthCityProp // място на раждане; ако е подадено, не се търси в страницата
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -547,6 +549,11 @@ const DownloadPDFButton = ({
           }
         }
       }
+      
+      // Името и мястото идват от страницата, когато са подадени. Иначе горното търсене в DOM
+      // може да вземе чуждо поле (напр. името на партньора или друг падащ списък).
+      if (typeof userNameProp === 'string') userName = userNameProp.trim() || 'Неизвестен';
+      if (typeof birthCityProp === 'string') selectedCityName = birthCityProp.trim();
       
       // Determine API base URL
       const API_BASE_URL = import.meta.env.MODE === 'development' 

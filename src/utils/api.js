@@ -109,6 +109,11 @@ export const fetchReports = async (limit = 200) => (await api.get('/reports', { 
 export const fetchReport = async (id) => (await api.get(`/reports/${id}`)).data;
 export const deleteReport = async (id) => (await api.delete(`/reports/${id}`)).data;
 
+// Търсене на координати на място с AI. Връща { lat, lon, city, country }.
+// Бекендът чака до около 40 секунди (два опита към AI), затова заявката има по-дълъг таймаут.
+export const geocodePlace = async (city, country) =>
+  (await api.post('/geocode', { city, country }, { timeout: 45000 })).data;
+
 export const REPORT_TYPE_LABELS = {
   general: 'Общ анализ',
   health: 'Здраве',
