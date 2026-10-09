@@ -24,6 +24,9 @@ const NAV_ITEMS = [
 // Горна граница на периода на прогнозата (календарни месеци). Сървърът я праща в /billing/config;
 // тези стойности се ползват, докато конфигурацията не е заредена.
 const FALLBACK_LIMITS = { forecast_max_months_single: 3, forecast_max_months_pair: 2 };
+// Проверката на готовия текст (Фаза 10) може да добави една втора AI заявка към всеки месец
+const STREAM_IDLE_TIMEOUT_MS = 480000; // 8 минути без нито едно събитие от сървъра
+const REQUEST_TIMEOUT_MS = 480000;     // обикновена заявка (натален анализ или анализ за дата): 8 минути
 
 // Последният позволен ден за период, започващ на startIso (YYYY-MM-DD): краят на maxMonths-я календарен месец.
 const maxEndDate = (startIso, maxMonths) => {
@@ -308,9 +311,15 @@ const GenerateReport = () => {
   const handleDynamicForecastStreaming = async (API_BASE_URL, requestData) => {
     const token = localStorage.getItem('token');
     return new Promise((resolve, reject) => {
-      // AbortController with 5-minute timeout for Ollama
+      // AbortController: прекъсва само при пълно мълчание на сървъра. Времето се подновява с всяко получено събитие,
+      // защото един месец с проверка и поправка на фактите може да трае няколко минути.
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min
+      let timeoutId = null;
+      const armTimeout = () => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+      };
+      armTimeout();
       
       // Use fetch with ReadableStream for POST requests with SSE
       fetch(`${API_BASE_URL}/interpret-stream`, {
@@ -465,6 +474,7 @@ const GenerateReport = () => {
                 return;
               }
               
+              armTimeout();
               const text = decoder.decode(value, { stream: true });
               processText(text);
               pump();
@@ -595,7 +605,7 @@ const GenerateReport = () => {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          timeout: 300000  // 300 seconds timeout (5 min) for Ollama
+          timeout: REQUEST_TIMEOUT_MS  // анализът с проверка и евентуална поправка на фактите може да трае няколко минути
         });
 
         if (response.data.crisis) {
