@@ -361,6 +361,12 @@ const GenerateReport = () => {
           }
         };
 
+        // Общият преглед на периода (когато е готов) е първи, после месеците
+        const formatInterpretation = (items) => items.map((m, idx) => {
+          const separator = idx > 0 ? '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' : '';
+          return `${separator}## ${m.isOverview ? '🔭' : '📅'} ${m.month}\n\n${m.text}`;
+        }).join('\n\n');
+
         const handleSSEMessage = (data, monthlyResultsTemp, resolve, reject) => {
           switch (data.type) {
             case 'start':
@@ -393,17 +399,33 @@ const GenerateReport = () => {
               
               // Update result with accumulated months
               // Format with clean markdown for proper rendering in PDF
-              const formattedInterpretation = monthlyResultsTemp.map((m, idx) => {
-                const separator = idx > 0 ? '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' : '';
-                return `${separator}## 📅 ${m.month}\n\n${m.text}`;
-              }).join('\n\n');
-              
               setResult(prev => ({
                 ...prev,
-                interpretation: formattedInterpretation,
+                interpretation: formatInterpretation(monthlyResultsTemp),
                 natal_chart: prev?.natal_chart || null,
                 partner_chart: prev?.partner_chart || null,
                 transit_chart: prev?.transit_chart || null // Preserve transit_chart
+              }));
+              break;
+
+            case 'overview_start':
+              setLoadingMessage('Съставяне на общия преглед на периода...');
+              break;
+
+            case 'overview_complete':
+              // Общият преглед идва след месеците, но се показва най-отгоре (и първи в PDF и DOCX)
+              monthlyResultsTemp.unshift({
+                month: data.title || 'Общ преглед на периода',
+                text: data.text,
+                isOverview: true
+              });
+              setMonthlyResults([...monthlyResultsTemp]);
+              setResult(prev => ({
+                ...prev,
+                interpretation: formatInterpretation(monthlyResultsTemp),
+                natal_chart: prev?.natal_chart || null,
+                partner_chart: prev?.partner_chart || null,
+                transit_chart: prev?.transit_chart || null
               }));
               break;
               
@@ -425,6 +447,9 @@ const GenerateReport = () => {
               hasError = true;
               clearTimeout(timeoutId);
               setError(data.message || 'Грешка при генериране на прогноза');
+              // Неуспешната прогноза не се записва и не се таксува: не оставяме недовършени месеци на екрана
+              setMonthlyResults([]);
+              setResult(prev => (prev ? { ...prev, interpretation: '' } : prev));
               reject(new Error(data.message));
               break;
           }
