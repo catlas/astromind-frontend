@@ -21,6 +21,27 @@ const NAV_ITEMS = [
   { path: '/buy-coins', icon: 'credit_card', label: 'Монети' },
 ];
 
+// Горна граница на периода на прогнозата (календарни месеци). Сървърът я праща в /billing/config;
+// тези стойности се ползват, докато конфигурацията не е заредена.
+const FALLBACK_LIMITS = { forecast_max_months_single: 3, forecast_max_months_pair: 2 };
+
+// Последният позволен ден за период, започващ на startIso (YYYY-MM-DD): краят на maxMonths-я календарен месец.
+const maxEndDate = (startIso, maxMonths) => {
+  const [y, m] = String(startIso || '').split('-').map(Number);
+  if (!y || !m) return '';
+  const last = new Date(y, m - 1 + maxMonths, 0);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`;
+};
+
+const formatBgDate = (iso) => (iso ? iso.split('-').reverse().join('.') : '');
+
+// Пол се праща към AI само ако е избран профил с посочен пол и името не е променяно
+const knownGender = (profile, typedName) =>
+  profile && profile.name === String(typedName || '').trim() && (profile.gender === 'male' || profile.gender === 'female')
+    ? profile.gender
+    : undefined;
+
 const GenerateReport = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -120,6 +141,13 @@ const GenerateReport = () => {
 
   const selectedProfile = savedProfiles.find((p) => String(p.id) === profileChoice) || null;
   const partnerProfile = savedProfiles.find((p) => String(p.id) === partnerChoice) || null;
+
+  // Горна граница на периода на прогнозата (календарни месеци), по настройките на сървъра
+  const forecastLimits = { ...FALLBACK_LIMITS, ...(billingConfig?.limits || {}) };
+  const forecastMaxMonths = enablePartner ? forecastLimits.forecast_max_months_pair : forecastLimits.forecast_max_months_single;
+  const forecastStart = transitData.target_date || `${new Date().getFullYear()}-01-01`;
+  const forecastMaxEnd = maxEndDate(forecastStart, forecastMaxMonths);
+  const forecastWho = enablePartner ? 'за двама души' : 'за един човек';
 
   const emptyPartnerData = { partner_name: '', partner_date: '', partner_time: '' };
 
@@ -459,6 +487,18 @@ const GenerateReport = () => {
         throw new Error('Географската дължина трябва да е между -180 и 180');
       }
 
+      if (isDynamic) {
+        if (!endDate) {
+          throw new Error('Изберете крайна дата на прогнозата');
+        }
+        if (endDate < forecastStart) {
+          throw new Error('Крайната дата на прогнозата трябва да е след началната.');
+        }
+        if (forecastMaxEnd && endDate > forecastMaxEnd) {
+          throw new Error(`Прогнозата може да обхваща най-много ${forecastMaxMonths} месеца ${forecastWho}. Крайната дата може да е най-късно ${formatBgDate(forecastMaxEnd)}.`);
+        }
+      }
+
       // Подготовка на данните за заявката
       const requestData = {
         name: name.trim() || undefined,
@@ -469,6 +509,8 @@ const GenerateReport = () => {
         question: formData.question || undefined,
         report_type: reportType,
       };
+      const firstGender = knownGender(selectedProfile, name);
+      if (firstGender) requestData.gender = firstGender;
 
       // Условна логика за Dynamic Forecast Mode
       if (isDynamic) {
@@ -506,6 +548,8 @@ const GenerateReport = () => {
           requestData.partner_time = partnerData.partner_time;
           requestData.partner_lat = partnerLat;
           requestData.partner_lon = partnerLon;
+          const secondGender = knownGender(partnerProfile, partnerData.partner_name);
+          if (secondGender) requestData.partner_gender = secondGender;
         }
       }
 
@@ -885,10 +929,15 @@ const GenerateReport = () => {
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
                             required={isDynamic}
+                            min={forecastStart}
+                            max={forecastMaxEnd || undefined}
                             className="w-full px-4 py-2 bg-slate-700/50 border border-blue-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                           />
                         </div>
                       </div>
+                      <p className="text-xs text-gray-400">
+                        Периодът може да е най-много {forecastMaxMonths} месеца {forecastWho}: крайната дата е най-късно {formatBgDate(forecastMaxEnd)}.
+                      </p>
                     </div>
                   )}
                 </div>

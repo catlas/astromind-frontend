@@ -111,13 +111,14 @@ const MemoryPanel = () => {
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
             <p className="text-white text-sm font-medium">Използвай паметта в анализите</p>
-            <p className="text-xs text-[#a69db9]">Когато е изключено, AI не вижда нито бележките, нито предишните ви анализи.</p>
+            <p className="text-xs text-[#a69db9]">Когато е изключено, AI не вижда нито една от бележките ви.</p>
           </div>
           <Toggle checked={data.enabled} onChange={toggle} />
         </div>
         <p className="text-xs text-[#a69db9]">
-          AI помни само това, което напишете тук, и заглавията на последните ви три анализа за същия профил. Нищо не се добавя
-          автоматично. Можете да редактирате или изтриете всичко по всяко време.
+          AI помни само това, което напишете тук. Нищо не се добавя автоматично, а предишните ви анализи не се подават като факти.
+          Бележките „За мен“ се ползват само когато анализирате вашия основен профил, а бележките „Само за …“ - когато този човек
+          е в анализа. Можете да редактирате или изтриете всичко по всяко време.
         </p>
       </SectionCard>
 
@@ -134,7 +135,7 @@ const MemoryPanel = () => {
           <div className="flex flex-wrap items-center gap-3">
             <select value={profileName} onChange={(e) => setProfileName(e.target.value)}
               className="bg-[#161022] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
-              <option value="">За всички анализи</option>
+              <option value="">За мен (основния ми профил)</option>
               {profiles.map((p) => <option key={p.id} value={p.name}>Само за {p.name}</option>)}
             </select>
             <button disabled={!text.trim()} className="px-5 py-2 rounded-xl bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-sm font-bold disabled:opacity-50">
@@ -150,7 +151,7 @@ const MemoryPanel = () => {
               <li key={n.id} className="flex items-start gap-3 py-3">
                 <div className="flex-1">
                   <p className="text-sm text-white">{n.text}</p>
-                  <p className="text-xs text-[#a69db9]">{n.profile_name ? `Само за ${n.profile_name}` : 'За всички анализи'}</p>
+                  <p className="text-xs text-[#a69db9]">{n.profile_name ? `Само за ${n.profile_name}` : 'За мен (основния ми профил)'}</p>
                 </div>
                 <button onClick={() => remove(n.id)} className="p-1 text-slate-500 hover:text-red-400" title="Изтрий">
                   <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
@@ -168,7 +169,7 @@ const MemoryPanel = () => {
       <SectionCard title="Какво точно вижда AI" description="Текстът, който се добавя към следващия анализ" icon="visibility">
         <select value={previewFor} onChange={(e) => { setPreviewFor(e.target.value); load(e.target.value); }}
           className="mb-3 bg-[#161022] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
-          <option value="">Анализ без избран профил</option>
+          <option value="">Анализ за основния профил</option>
           {profiles.map((p) => <option key={p.id} value={p.name}>Анализ за {p.name}</option>)}
         </select>
         <pre className="whitespace-pre-wrap text-xs text-slate-300 bg-[#161022] border border-slate-800 rounded-xl p-4 min-h-[60px]">

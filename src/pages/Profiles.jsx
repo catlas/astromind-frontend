@@ -17,7 +17,7 @@ const relationOptions = [
 const genderOptions = [
   { value: 'male', label: 'Мъж' },
   { value: 'female', label: 'Жена' },
-  { value: 'other', label: 'Друг' },
+  { value: 'unknown', label: 'Не посочвам' },
 ];
 
 const Profiles = () => {
@@ -34,7 +34,7 @@ const Profiles = () => {
   const [form, setForm] = useState({
     name: '',
     relation: 'self',
-    gender: 'female',
+    gender: 'unknown',
     birth_date: '',
     birth_time: '',
     unknown_time: false,
@@ -48,7 +48,7 @@ const Profiles = () => {
   const toUiProfile = (p) => ({
     ...p,
     relationLabel: relationOptions.find((r) => r.value === p.relation)?.label || 'Друг',
-    gender: p.gender || 'other',
+    gender: p.gender === 'male' || p.gender === 'female' ? p.gender : 'unknown',
     lat: p.lat ?? '',
     lon: p.lon ?? '',
   });
@@ -111,7 +111,7 @@ const Profiles = () => {
     setForm({
       name: '',
       relation: 'self',
-      gender: 'female',
+      gender: 'unknown',
       birth_date: '',
       birth_time: '',
       unknown_time: false,
@@ -131,7 +131,7 @@ const Profiles = () => {
     const body = {
       name: form.name,
       relation: form.relation,
-      gender: form.gender,
+      gender: form.gender === 'male' || form.gender === 'female' ? form.gender : null,
       birth_date: form.birth_date,
       birth_time: form.unknown_time ? '' : form.birth_time,
       unknown_time: form.unknown_time,
