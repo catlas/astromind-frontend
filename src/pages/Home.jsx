@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/auth';
 import { FALLBACK_LIMITS, FALLBACK_PRICES, FALLBACK_SIGNUP_GIFT, FALLBACK_TOPUPS, formatEur } from '../utils/money';
+import AstroChart from '../components/AstroChart';
+import { sampleChart, sampleExcerpt, sampleMeta } from '../data/sampleReading';
 
 // Нощно небе от CSS: без външна снимка (повече поверителност, по-малко трафик и политиката за съдържанието не пуска чужди картинки)
 const SKY_BACKGROUND = [
@@ -15,6 +17,22 @@ const SKY_BACKGROUND = [
   'radial-gradient(ellipse at 82% 72%, rgba(37,99,235,.35), transparent 50%)',
   '#0B0616',
 ].join(', ');
+
+// Карта на услуга: иконата и бележката „Основен“ / „Премиум“ следват цените (премиум се плаща само от внесени средства)
+const ServiceCard = ({ icon, tone, premium, title, children }) => (
+  <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
+    <div className={`absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${premium ? 'bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20' : 'bg-white/10 text-slate-300'}`}>
+      {premium ? 'Премиум' : 'Основен'}
+    </div>
+    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-2 ${tone}`}>
+      <span className="material-symbols-outlined text-2xl">{icon}</span>
+    </div>
+    <div>
+      <h4 className="text-white text-lg font-bold mb-2">{title}</h4>
+      <p className="text-slate-400 text-sm leading-relaxed">{children}</p>
+    </div>
+  </div>
+);
 
 const Home = () => {
   const navigate = useNavigate();
@@ -29,6 +47,8 @@ const Home = () => {
   const [forgotMsg, setForgotMsg] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [pricing, setPricing] = useState(null); // цени и пакети от сървъра; до зареждането (студен старт) важат стойностите по подразбиране
+
+  const limits = pricing?.limits || FALLBACK_LIMITS;
 
   // С HashRouter линкове като #features биха сменили маршрута; вместо това скролваме до секцията
   useEffect(() => {
@@ -255,15 +275,16 @@ const Home = () => {
             </div>
             
             <h1 className="text-white text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] tracking-tight mb-6">
-              Твоят Личен AI<br/>
-              Астролог.<br/>
-              <span className="text-[#5211d4] block">Дълбок.</span>
-              <span className="text-[#5211d4] block">Терапевтичен.</span>
-              <span className="text-white">24/7.</span>
+              Твоят личен<br/>
+              AI астролог.<br/>
+              <span className="text-[#5211d4] block">Точен.</span>
+              <span className="text-[#5211d4] block">Ясен.</span>
+              <span className="text-white">На български.</span>
             </h1>
             
             <p className="text-slate-400 text-lg font-normal leading-relaxed max-w-[540px] mb-8">
-              Разкодирайте психиката си със стратегически астрологичен анализ. Ние комбинираме древната мъдрост с напреднал AI, за да предоставим терапевтични насоки за вашето ежедневие.
+              Позициите, домовете и аспектите се изчисляват по астрономически данни, а AI ги обяснява на български. Готовият
+              текст се сверява с изчислените факти. За себепознание и размисъл: не е терапия и не е медицински, правен или финансов съвет.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mb-8">
@@ -273,9 +294,9 @@ const Home = () => {
               >
                 Безплатен Анализ
               </button>
-              <button className="flex h-12 min-w-[160px] items-center justify-center rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 px-6 text-white text-base font-medium transition-all">
+              <a href="#example" className="flex h-12 min-w-[160px] items-center justify-center rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 px-6 text-white text-base font-medium transition-all">
                 Примерен Прочит
-              </button>
+              </a>
             </div>
             
             <div className="flex items-center gap-2 text-slate-500 text-xs">
@@ -301,10 +322,11 @@ const Home = () => {
                     <span className="material-symbols-outlined text-white text-2xl">auto_awesome</span>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className="text-[#5211d4] text-xs font-bold uppercase tracking-wide">AstroMind AI</span>
+                    <span className="text-[#5211d4] text-xs font-bold uppercase tracking-wide">Откъс от реален анализ</span>
                     <p className="text-white text-base leading-relaxed font-medium">
-                      "Въз основа на разположението на Меркурий, днешният ден е идеален за интроспективна комуникация. Искате ли да проучите как това влияе на вашите взаимоотношения?"
+                      „{sampleExcerpt[0]}“
                     </p>
+                    <span className="text-slate-500 text-xs">{sampleMeta.who}, {sampleMeta.born}</span>
                   </div>
                 </div>
               </div>
@@ -318,172 +340,101 @@ const Home = () => {
         <div className="flex flex-col max-w-[1200px] flex-1">
           <div className="flex flex-col gap-10 py-10">
             <div className="flex flex-col gap-4 text-center items-center">
-              <h2 className="text-[#5211d4] font-bold tracking-wider uppercase text-sm">Космически Функции</h2>
+              <h2 className="text-[#5211d4] font-bold tracking-wider uppercase text-sm">Какво е различното</h2>
               <h3 className="text-white tracking-tight text-3xl font-bold leading-tight md:text-4xl max-w-[720px]">
-                Отключете древната мъдрост с модерни технологии
+                Изчисленията са точни, обясненията са от AI
               </h3>
-              <p className="text-slate-400 text-base font-normal leading-normal max-w-[600px]">
-                Изживейте астрология, създадена за себепознание и психологическо прозрение, а не просто предсказване на съдбата.
+              <p className="text-slate-400 text-base font-normal leading-normal max-w-[640px]">
+                Астрология за себепознание и размисъл, а не за предсказване на съдбата. Числата идват от програма, не от езиков модел.
               </p>
             </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="group flex flex-col gap-4 rounded-xl border border-white/5 bg-[#13111C] p-6 hover:border-[#5211d4]/50 transition-colors duration-300">
-                <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center text-[#5211d4] group-hover:bg-[#5211d4] group-hover:text-white transition-colors duration-300">
-                  <span className="material-symbols-outlined text-2xl">pie_chart</span>
+              {[
+                ['pie_chart', 'Изчислени карти', 'Позиции на планетите, домове и аспекти по ефемериди Swiss Ephemeris, с историческата часова зона на мястото. Час, който не съществува или се повтаря (смяна на времето), не се поправя тихо: питаме ви. Без известен час няма Асцендент и домове.'],
+                ['fact_check', 'Сверен текст', 'Готовият анализ се сверява с изчислените факти: дом, знак, аспект, дата. При несъответствие текстът се поправя, а ако и тогава не е верен, не се записва и не се таксува.'],
+                ['groups', 'Анализ с друг човек', 'Приятел, близък, дете, колега или партньор: вие избирате какви са отношенията и анализът не предполага романтика, ако не сте я посочили.'],
+              ].map(([icon, title, text]) => (
+                <div key={title} className="group flex flex-col gap-4 rounded-xl border border-white/5 bg-[#13111C] p-6 hover:border-[#5211d4]/50 transition-colors duration-300">
+                  <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center text-[#5211d4] group-hover:bg-[#5211d4] group-hover:text-white transition-colors duration-300">
+                    <span className="material-symbols-outlined text-2xl">{icon}</span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <h4 className="text-white text-xl font-bold leading-tight">{title}</h4>
+                    <p className="text-slate-400 text-sm font-normal leading-relaxed">{text}</p>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <h4 className="text-white text-xl font-bold leading-tight">Прецизни Натални Карти</h4>
-                  <p className="text-slate-400 text-sm font-normal leading-relaxed">
-                    Детайлно картографиране на рождената ви карта отвъд слънчевия знак. Разберете своята Луна, Асцендент и планетни домове.
-                  </p>
-                </div>
-              </div>
-              
-              <div className="group flex flex-col gap-4 rounded-xl border border-white/5 bg-[#13111C] p-6 hover:border-[#5211d4]/50 transition-colors duration-300">
-                <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center text-[#5211d4] group-hover:bg-[#5211d4] group-hover:text-white transition-colors duration-300">
-                  <span className="material-symbols-outlined text-2xl">sunny</span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <h4 className="text-white text-xl font-bold leading-tight">Дневни Аспекти</h4>
-                  <p className="text-slate-400 text-sm font-normal leading-relaxed">
-                    Анализ в реално време на планетните движения, съобразен с контекста на вашата карта и житейски път.
-                  </p>
-                </div>
-              </div>
-              
-              <div className="group flex flex-col gap-4 rounded-xl border border-white/5 bg-[#13111C] p-6 hover:border-[#5211d4]/50 transition-colors duration-300">
-                <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center text-[#5211d4] group-hover:bg-[#5211d4] group-hover:text-white transition-colors duration-300">
-                  <span className="material-symbols-outlined text-2xl">psychology</span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <h4 className="text-white text-xl font-bold leading-tight">Психоаналитични Дълбочини</h4>
-                  <p className="text-slate-400 text-sm font-normal leading-relaxed">
-                    Терапевтичен диалог, използващ астрологията като рамка за личностно израстване и работа със сенките.
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Services Section - НОВА СЕКЦИЯ */}
+      {/* Реален пример: карта, изчислена от двигателя, и откъс от анализ, генериран от приложението */}
+      <section className="relative px-6 py-16 lg:px-40 flex justify-center bg-[#0B0616]" id="example">
+        <div className="flex flex-col max-w-[1200px] flex-1 gap-8">
+          <div className="text-center flex flex-col items-center gap-3">
+            <h2 className="text-[#5211d4] font-bold tracking-wider uppercase text-sm">Примерен прочит</h2>
+            <h3 className="text-white text-3xl font-bold md:text-4xl max-w-[760px]">Така изглеждат картата и текстът</h3>
+            <p className="text-slate-400 max-w-[720px] text-sm">
+              Картата е изчислена от AstroMind за тестов профил ({sampleMeta.born}), а текстът е откъс от анализ, генериран от
+              приложението на {sampleMeta.generated} и сверен с изчислените данни. Въпросът беше: „{sampleMeta.question}“. Не е истински
+              човек, а резултатът за вас ще е различен.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <div className="rounded-2xl border border-white/10 bg-[#13111C] p-4 overflow-x-auto">
+              <AstroChart data={sampleChart} />
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-[#13111C] p-6 flex flex-col gap-4 text-slate-300 leading-relaxed text-sm">
+              <h4 className="text-white font-bold text-lg">Личностни черти</h4>
+              {sampleExcerpt.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+              <p className="text-xs text-slate-500">Откъсът е съкратен. Пълният анализ има още раздели и конкретна първа стъпка.</p>
+              <button
+                onClick={() => { setShowAuth(true); setIsLogin(false); }}
+                className="self-start mt-2 px-5 py-2.5 rounded-lg bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-sm font-bold transition-all"
+              >
+                Направете свой анализ
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Услуги: само това, което приложението наистина прави */}
       <section className="relative px-6 py-16 lg:px-40 flex justify-center bg-[#0B0616] overflow-hidden" id="how-it-works">
         <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#5211d4]/5 to-transparent pointer-events-none"></div>
         <div className="flex flex-col max-w-[1200px] flex-1 relative z-10">
           <div className="flex flex-col gap-4 text-center items-center mb-16">
-            <h2 className="text-[#5211d4] font-bold tracking-wider uppercase text-sm">Услуги и Функции</h2>
+            <h2 className="text-[#5211d4] font-bold tracking-wider uppercase text-sm">Услуги</h2>
             <h3 className="text-white tracking-tight text-3xl font-bold leading-tight md:text-4xl max-w-[800px]">
-              Отключете пълния потенциал на AstroMind
+              Какво можете да поискате
             </h3>
             <p className="text-slate-400 text-base font-normal leading-normal max-w-[700px]">
-              Разгледайте нашите специализирани астрологични доклади. Започнете с подарък при регистрация и плащайте само за анализите, които ползвате. Премиум услугите се отключват след първото зареждане на баланса.
+              Започвате с подарък при регистрация. Основните анализи се плащат от подаръка или от баланса, а премиум услугите само от внесени средства.
             </p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {/* Натална Карта (Lite) */}
-            <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-2">
-                <span className="material-symbols-outlined text-2xl">person</span>
-              </div>
-              <div>
-                <h4 className="text-white text-lg font-bold mb-2">Натална Карта (Lite)</h4>
-                <p className="text-slate-400 text-sm leading-relaxed">Вашият космически паспорт. Основни разположения и личностни черти за силен старт.</p>
-              </div>
-            </div>
-            
-            {/* Дневен Аспект */}
-            <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
-              <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 mb-2">
-                <span className="material-symbols-outlined text-2xl">sunny</span>
-              </div>
-              <div>
-                <h4 className="text-white text-lg font-bold mb-2">Дневен Аспект</h4>
-                <p className="text-slate-400 text-sm leading-relaxed">Ежедневен компас. Разберете енергията на деня чрез транзитите към вашата карта.</p>
-              </div>
-            </div>
-            
-            {/* Конкретен Въпрос */}
-            <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
-              <div className="w-12 h-12 rounded-xl bg-[#5211d4]/10 flex items-center justify-center text-[#5211d4] mb-2">
-                <span className="material-symbols-outlined text-2xl">chat_bubble</span>
-              </div>
-              <div>
-                <h4 className="text-white text-lg font-bold mb-2">Конкретен Въпрос</h4>
-                <p className="text-slate-400 text-sm leading-relaxed">Имате дилема? Получете AI отговор, съобразен изцяло с вашата уникална астрология.</p>
-              </div>
-            </div>
-            
-            {/* Месечен Анализ */}
-            <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20 uppercase tracking-wide flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Премиум
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-[#5211d4]/10 flex items-center justify-center text-[#5211d4] mb-2">
-                <span className="material-symbols-outlined text-2xl">calendar_month</span>
-              </div>
-              <div>
-                <h4 className="text-white text-lg font-bold mb-2">Месечен Анализ</h4>
-                <p className="text-slate-400 text-sm leading-relaxed">Стратегическо планиране. Ключови дати и теми за успех през предстоящия месец.</p>
-              </div>
-            </div>
-            
-            {/* Синастрия */}
-            <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20 uppercase tracking-wide flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Премиум
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-pink-500/10 flex items-center justify-center text-pink-400 mb-2">
-                <span className="material-symbols-outlined text-2xl">favorite</span>
-              </div>
-              <div>
-                <h4 className="text-white text-lg font-bold mb-2">Синастрия</h4>
-                <p className="text-slate-400 text-sm leading-relaxed">Любов и партньорство. Дълбок анализ на съвместимостта и динамиката във връзката.</p>
-              </div>
-            </div>
-            
-            {/* Годишен Доклад */}
-            <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20 uppercase tracking-wide flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Премиум
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400 mb-2">
-                <span className="material-symbols-outlined text-2xl">rocket_launch</span>
-              </div>
-              <div>
-                <h4 className="text-white text-lg font-bold mb-2">Годишен Доклад</h4>
-                <p className="text-slate-400 text-sm leading-relaxed">Голямата картина. Вашата соларна карта и пътна карта за следващите 12 месеца.</p>
-              </div>
-            </div>
-            
-            {/* Кариера и Пари */}
-            <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
-              <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-400 mb-2">
-                <span className="material-symbols-outlined text-2xl">work</span>
-              </div>
-              <div>
-                <h4 className="text-white text-lg font-bold mb-2">Кариера и Пари</h4>
-                <p className="text-slate-400 text-sm leading-relaxed">Професионален път. Открийте идеалната си кариера и финансови възможности според звездите.</p>
-              </div>
-            </div>
-            
-            {/* Кармичен Анализ */}
-            <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
-              <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 mb-2">
-                <span className="material-symbols-outlined text-2xl">psychology</span>
-              </div>
-              <div>
-                <h4 className="text-white text-lg font-bold mb-2">Кармичен Анализ</h4>
-                <p className="text-slate-400 text-sm leading-relaxed">Пътуване в дълбините. Разкрийте минали животи, кармични възли и уроците, които душата ви е дошла да научи. Най-дълбокият ни анализ.</p>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <ServiceCard icon="person" tone="bg-blue-500/10 text-blue-400" title="Натална карта по тема">
+              Карта и текст по една тема: общ анализ, здраве, кариера, пари, любов или карма и род. Здравето не е диагноза, а парите не са инвестиционен съвет.
+            </ServiceCard>
+            <ServiceCard icon="event" tone="bg-orange-500/10 text-orange-400" title="Анализ за избрана дата">
+              Транзитите към вашата карта за дата и час по ваш избор, с аспектите към натала и домовете на транзитните планети.
+            </ServiceCard>
+            <ServiceCard icon="chat_bubble" tone="bg-[#5211d4]/10 text-[#5211d4]" title="Конкретен въпрос">
+              До {1500} знака въпрос към същия анализ. Отговорът е свързан с изчислените данни, а не с общи фрази.
+            </ServiceCard>
+            <ServiceCard icon="groups" tone="bg-pink-500/10 text-pink-400" premium title="Анализ с друг човек">
+              Синастрия и взаимодействие между вас и приятел, близък, дете, колега или партньор. Типът отношения е ваш избор и важи за целия анализ.
+            </ServiceCard>
+            <ServiceCard icon="calendar_month" tone="bg-green-500/10 text-green-400" premium title="Прогноза за период">
+              Точен календар на събитията месец по месец и общ преглед на периода
+              {limits.forecast_max_months_single && limits.forecast_max_months_pair
+                ? `: до ${limits.forecast_max_months_single} месеца за един човек и до ${limits.forecast_max_months_pair} за двама.`
+                : '.'}
+            </ServiceCard>
+            <ServiceCard icon="history" tone="bg-purple-500/10 text-purple-400" title="Профили и история">
+              Профили за вас и близките ви, всеки анализ в Историята и изтегляне като DOCX или Markdown без нова такса. Непознат час на раждане също се поддържа.
+            </ServiceCard>
           </div>
         </div>
       </section>
@@ -618,64 +569,30 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="relative px-6 py-16 lg:px-40 flex justify-center bg-[#0B0616] border-t border-[#2e2839]">
+      {/* Ограничения и данни: честно какво се случва с данните и какво не е AstroMind */}
+      <section className="relative px-6 py-16 lg:px-40 flex justify-center bg-[#0B0616] border-t border-[#2e2839]" id="limits">
         <div className="flex flex-col max-w-[1200px] flex-1">
-          <h2 className="text-white text-2xl font-bold mb-10 px-4">Доверие от търсещите</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-xl bg-[#1f1c27] border border-[#2e2839]">
-              <div className="flex items-center gap-1 text-yellow-500 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <span key={i} className="material-symbols-outlined text-sm">star</span>
-                ))}
-              </div>
-              <p className="text-slate-300 text-sm italic mb-6">
-                "Използвала съм други астрологични приложения, но AstroMind се усеща като разговор с истински терапевт, който познава наталната ми карта. Точността е шокираща!"
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-700"></div>
-                <div>
-                  <p className="text-white text-sm font-bold">Сара Дж.</p>
-                  <p className="text-slate-500 text-xs">Скорпион Слънце</p>
-                </div>
-              </div>
+          <h2 className="text-white text-2xl font-bold mb-8 px-4">Честно за ограниченията и данните</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 rounded-xl bg-[#1f1c27] border border-[#2e2839] text-slate-300 text-sm leading-relaxed space-y-3">
+              <h3 className="text-white font-bold text-base">Какво не е AstroMind</h3>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>Не е терапия, диагноза, медицински, правен или финансов съвет. При криза или здравословен проблем потърсете специалист.</li>
+                <li>Не предсказва бъдещето. Астрологията е рамка за размисъл, а не доказана наука.</li>
+                <li>AI може да сгреши. Позициите, домовете и аспектите са изчислени и текстът се сверява с тях, но тълкуването е негово.</li>
+                <li>Мястото на раждане е точка на населено място, не точен адрес. Без час на раждане няма Асцендент и домове.</li>
+              </ul>
             </div>
-            
-            <div className="p-6 rounded-xl bg-[#1f1c27] border border-[#2e2839]">
-              <div className="flex items-center gap-1 text-yellow-500 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <span key={i} className="material-symbols-outlined text-sm">star</span>
-                ))}
-              </div>
-              <p className="text-slate-300 text-sm italic mb-6">
-                "Харесва ми, че плащам само за анализите, от които имам нужда. Дневните аспекти са точни и ми помагат да планирам работната седмица."
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-700"></div>
-                <div>
-                  <p className="text-white text-sm font-bold">Маркъс Т.</p>
-                  <p className="text-slate-500 text-xs">Козирог Асцендент</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-6 rounded-xl bg-[#1f1c27] border border-[#2e2839]">
-              <div className="flex items-center gap-1 text-yellow-500 mb-4">
-                {[...Array(4)].map((_, i) => (
-                  <span key={i} className="material-symbols-outlined text-sm">star</span>
-                ))}
-                <span className="material-symbols-outlined text-sm">star_half</span>
-              </div>
-              <p className="text-slate-300 text-sm italic mb-6">
-                "Накрая приложение, което обяснява 'защо' зад астрологията. Образователно е и дълбоко успокояващо по време на тежки транзити."
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-700"></div>
-                <div>
-                  <p className="text-white text-sm font-bold">Елена Р.</p>
-                  <p className="text-slate-500 text-xs">Близнаци Луна</p>
-                </div>
-              </div>
+            <div className="p-6 rounded-xl bg-[#1f1c27] border border-[#2e2839] text-slate-300 text-sm leading-relaxed space-y-3">
+              <h3 className="text-white font-bold text-base">Кой получава какви данни</h3>
+              <ul className="list-disc pl-5 space-y-2">
+                <li><b>AI доставчик</b> (Ollama Cloud, при отказ Together AI): данните на картата, въпросът ви и включените бележки от паметта. Без имейл и парола.</li>
+                <li><b>Хостинг и база данни</b> (Render, Франкфурт): акаунтът, профилите и анализите ви.</li>
+                <li><b>Плащане</b> (Stripe, когато е включено): картата не стига до нас.</li>
+                <li><b>Google Fonts</b>: шрифтовете се зареждат от Google, който вижда адреса ви.</li>
+                <li>Местата се търсят в вградена база (GeoNames), без заявка към трети страни.</li>
+              </ul>
+              <p>Подробности: <a href="#/legal/privacy" className="underline text-purple-300">Политика за поверителност</a>. Профилите и анализите се изтриват от Настройки.</p>
             </div>
           </div>
         </div>
@@ -684,36 +601,22 @@ const Home = () => {
       {/* Footer */}
       <footer className="bg-[#0b090f] text-white py-12 px-6 lg:px-40 border-t border-[#2e2839]">
         <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between gap-10">
-          <div className="flex flex-col gap-4 max-w-[300px]">
+          <div className="flex flex-col gap-4 max-w-[320px]">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[#5211d4] text-2xl">auto_awesome</span>
               <h2 className="text-lg font-bold">AstroMind</h2>
             </div>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Вашият личен AI Астролог, наличен 24/7. Разкодирайте психиката си и навигирайте живота с космическа стратегическа интелигентност.
+              Астрологични карти и анализи на български за себепознание. Изчисленията са точни, а обясненията са от AI.
             </p>
-            <div className="flex gap-4 mt-2">
-              <a href="#" className="text-slate-500 hover:text-white transition-colors">
-                <span className="material-symbols-outlined">public</span>
-              </a>
-              <a href="#" className="text-slate-500 hover:text-white transition-colors">
-                <span className="material-symbols-outlined">alternate_email</span>
-              </a>
-            </div>
           </div>
-          
           <div className="flex gap-10 md:gap-20 flex-wrap">
             <div className="flex flex-col gap-4">
               <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">Продукт</h3>
-              <a href="#features" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Функции</a>
+              <a href="#features" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Какво е различното</a>
+              <a href="#example" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Примерен прочит</a>
               <a href="#pricing" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Цени</a>
-              <a href="#/balance" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Баланс</a>
-            </div>
-            <div className="flex flex-col gap-4">
-              <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">Компания</h3>
-              <a href="#" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">За нас</a>
-              <a href="#" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Блог</a>
-              <a href="#" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Контакти</a>
+              <a href="#limits" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Ограничения и данни</a>
             </div>
             <div className="flex flex-col gap-4">
               <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">Правни</h3>
@@ -724,9 +627,12 @@ const Home = () => {
             </div>
           </div>
         </div>
-        <div className="max-w-[1200px] mx-auto mt-12 pt-8 border-t border-[#2e2839] text-center md:text-left">
+        <div className="max-w-[1200px] mx-auto mt-12 pt-8 border-t border-[#2e2839] text-center md:text-left space-y-2">
           <p className="text-slate-600 text-xs">
-            © {new Date().getFullYear()} AstroMind. Всички права запазени. Съдържанието е за самоанализ и развлечение и не е медицински, финансов или правен съвет.
+            © {new Date().getFullYear()} AstroMind. Съдържанието е за самоанализ и не е медицински, правен или финансов съвет.
+          </p>
+          <p className="text-slate-600 text-xs">
+            Данни за местата: <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer" className="underline">GeoNames</a> (CC BY 4.0).
           </p>
         </div>
       </footer>

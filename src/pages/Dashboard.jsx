@@ -496,17 +496,17 @@ const Dashboard = () => {
             {/* Right Column - Дневен транзит */}
             <div className="flex flex-col gap-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white tracking-tight">Дневен транзит</h2>
+                <h2 className="text-xl font-bold text-white tracking-tight">Транзити</h2>
               </div>
               <div className="p-5 rounded-xl bg-gradient-to-br from-[#2a2438] to-[#161022] border border-slate-800 relative overflow-hidden h-full min-h-[300px] flex flex-col justify-between">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#5211d4]/20 blur-[60px] rounded-full pointer-events-none"></div>
                 <div>
                   <div className="flex items-center gap-2 mb-4">
                     <span className="material-symbols-outlined text-[#a69db9]">travel_explore</span>
-                    <span className="text-white font-bold text-lg">Транзитите за днес</span>
+                    <span className="text-white font-bold text-lg">Транзити за дата</span>
                   </div>
                   <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                    Тук ще виждаш дневния транзит, изчислен по твоята натална карта. Дотогава можеш да генерираш транзитен анализ за днешна дата.
+                    Транзитите към твоята натална карта за днешна дата (или за друга по твой избор) получаваш с анализ за дата.
                   </p>
                 </div>
                 <div className="mt-auto pt-4 border-t border-white/10">

@@ -224,15 +224,8 @@ export default function Settings() {
   const [passwordMsg, setPasswordMsg] = useState(null);
 
   // Preferences
-  const [timezone, setTimezone] = useState(() => localStorage.getItem('astro_timezone') || 'Europe/Sofia');
-  const [zodiacSystem, setZodiacSystem] = useState(() => localStorage.getItem('astro_zodiac') || 'tropical');
-  const [language, setLanguage] = useState(() => localStorage.getItem('astro_language') || 'bg');
-  const [prefSaved, setPrefSaved] = useState(false);
 
   // Notifications
-  const [notifReport, setNotifReport] = useState(() => localStorage.getItem('astro_notif_report') !== 'false');
-  const [notifDaily, setNotifDaily] = useState(() => localStorage.getItem('astro_notif_daily') === 'true');
-  const [notifPromo, setNotifPromo] = useState(() => localStorage.getItem('astro_notif_promo') !== 'false');
 
   // Privacy
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -336,20 +329,6 @@ export default function Settings() {
     }
   };
 
-  const handleSavePreferences = () => {
-    localStorage.setItem('astro_timezone', timezone);
-    localStorage.setItem('astro_zodiac', zodiacSystem);
-    localStorage.setItem('astro_language', language);
-    setPrefSaved(true);
-    setTimeout(() => setPrefSaved(false), 3000);
-  };
-
-  const handleNotifChange = (key, value) => {
-    localStorage.setItem(key, String(value));
-    if (key === 'astro_notif_report') setNotifReport(value);
-    if (key === 'astro_notif_daily') setNotifDaily(value);
-    if (key === 'astro_notif_promo') setNotifPromo(value);
-  };
 
   const handleExportData = async () => {
     let data;
@@ -647,114 +626,27 @@ export default function Settings() {
       case 'preferences':
         return (
           <div className="flex flex-col gap-6">
-            <SectionCard title="Астрологични настройки" description="Персонализирай изчисленията и интерпретациите" icon="public">
-              <div className="flex flex-col gap-5">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-300">Зодиакална система</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { value: 'tropical', label: 'Тропическа', desc: 'Западна астрология (по-разпространена)' },
-                      { value: 'sidereal', label: 'Сидерална', desc: 'Ведическа / Jyotish астрология' },
-                    ].map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setZodiacSystem(opt.value)}
-                        className={`p-4 rounded-xl border text-left transition-all ${zodiacSystem === opt.value ? 'border-[#5211d4] bg-[#5211d4]/10' : 'border-slate-700 hover:border-slate-600'}`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${zodiacSystem === opt.value ? 'border-[#5211d4] bg-[#5211d4]' : 'border-slate-600'}`} />
-                          <span className="text-sm font-semibold text-white">{opt.label}</span>
-                        </div>
-                        <p className="text-xs text-[#a69db9] pl-5">{opt.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-300">Часова зона</label>
-                  <select
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full bg-[#161022] border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#5211d4] transition-colors"
-                  >
-                    <option value="Europe/Sofia">Europe/Sofia (UTC+2/+3)</option>
-                    <option value="Europe/London">Europe/London (UTC+0/+1)</option>
-                    <option value="Europe/Berlin">Europe/Berlin (UTC+1/+2)</option>
-                    <option value="America/New_York">America/New_York (UTC-5/-4)</option>
-                    <option value="America/Los_Angeles">America/Los_Angeles (UTC-8/-7)</option>
-                    <option value="Asia/Tokyo">Asia/Tokyo (UTC+9)</option>
-                    <option value="UTC">UTC</option>
-                  </select>
-                  <p className="text-xs text-[#a69db9]">Използва се за точни астрологични изчисления</p>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-300">Език на интерфейса</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { value: 'bg', label: '🇧🇬 Български' },
-                      { value: 'en', label: '🇬🇧 English', soon: true },
-                    ].map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => !opt.soon && setLanguage(opt.value)}
-                        disabled={opt.soon}
-                        className={`p-3 rounded-xl border text-sm font-medium transition-all flex items-center gap-2 ${language === opt.value ? 'border-[#5211d4] bg-[#5211d4]/10 text-white' : 'border-slate-700 text-slate-400 hover:border-slate-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {opt.label}
-                        {opt.soon && <span className="ml-auto text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full">Скоро</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <SectionCard title="Как се изчисляват картите" description="Тези настройки са фиксирани: не се променят от акаунта" icon="public">
+              <div className="flex flex-col gap-3 text-sm text-slate-300 leading-relaxed">
+                <p><b className="text-white">Зодиак:</b> тропически (западна астрология). Сидерален режим не се поддържа.</p>
+                <p><b className="text-white">Домове:</b> Плацидус. Без известен час на раждане няма Асцендент, MC и домове.</p>
+                <p><b className="text-white">Възел:</b> истински лунен възел. Ефемериди: Swiss Ephemeris.</p>
+                <p><b className="text-white">Часова зона:</b> определя се от мястото на раждане и историческата дата, не от настройка. Час, който не съществува или се повтаря при смяна на времето, се уточнява с вас.</p>
+                <p><b className="text-white">Език:</b> български.</p>
               </div>
             </SectionCard>
-
-            <div className="flex justify-end">
-              <button
-                onClick={handleSavePreferences}
-                className="flex items-center gap-2 px-6 py-2.5 bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-[#5211d4]/20"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>save</span>
-                {prefSaved ? 'Запазено ✓' : 'Запази предпочитания'}
-              </button>
-            </div>
           </div>
         );
 
       case 'notifications':
         return (
           <div className="flex flex-col gap-6">
-            <SectionCard title="Email известия" description="Управлявай кои известия получаваш по имейл" icon="email">
-              <SettingsRow
-                label="Завършен отчет"
-                description="Получи имейл когато твоят AI анализ е готов"
-              >
-                <Toggle checked={notifReport} onChange={(v) => handleNotifChange('astro_notif_report', v)} />
-              </SettingsRow>
-              <SettingsRow
-                label="Дневен хороскоп"
-                description="Ежедневен кратък хороскоп изпратен на имейла ти"
-              >
-                <Toggle checked={notifDaily} onChange={(v) => handleNotifChange('astro_notif_daily', v)} />
-              </SettingsRow>
-              <SettingsRow
-                label="Промоционални оферти"
-                description="Специални оферти за баланса и нови функции"
-              >
-                <Toggle checked={notifPromo} onChange={(v) => handleNotifChange('astro_notif_promo', v)} />
-              </SettingsRow>
+            <SectionCard title="Имейл" description="Какви писма изпращаме" icon="email">
+              <div className="flex flex-col gap-3 text-sm text-slate-300 leading-relaxed">
+                <p>Изпращаме само писма за потвърждение на имейла и за нова парола. Други известия, дневен хороскоп и промоции няма.</p>
+                <p>Писмата отиват на <span className="text-white font-medium">{user.email}</span>. За промяна на адреса отидете в <button onClick={() => setActiveTab('account')} className="text-[#5211d4] hover:underline font-medium">Акаунт</button>.</p>
+              </div>
             </SectionCard>
-
-            <div className="bg-[#5211d4]/5 border border-[#5211d4]/20 rounded-2xl p-5 flex items-start gap-3">
-              <span className="material-symbols-outlined text-[#5211d4] flex-shrink-0" style={{ fontSize: '20px' }}>info</span>
-              <p className="text-sm text-[#a69db9] leading-relaxed">
-                Известията се изпращат на адрес <span className="text-white font-medium">{user.email}</span>. За промяна на имейл адреса отиди в секция <button onClick={() => setActiveTab('account')} className="text-[#5211d4] hover:underline font-medium">Акаунт</button>.
-              </p>
-            </div>
           </div>
         );
 

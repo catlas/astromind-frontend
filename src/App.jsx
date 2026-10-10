@@ -1,15 +1,19 @@
-import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
 import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-import Balance from './pages/Balance';
-import GenerateReport from './pages/GenerateReport';
-import Profiles from './pages/Profiles';
-import History from './pages/History';
-import Settings from './pages/Settings';
-import { ResetPassword, VerifyEmail } from './pages/AuthLinkPages';
-import Admin from './pages/Admin';
-import Welcome from './pages/Welcome';
-import Legal from './pages/Legal';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+
+// Първата страница се зарежда веднага, останалите екрани по заявка: по-малък първи пакет, по-бърз старт на телефон
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Balance = lazy(() => import('./pages/Balance'));
+const GenerateReport = lazy(() => import('./pages/GenerateReport'));
+const Profiles = lazy(() => import('./pages/Profiles'));
+const History = lazy(() => import('./pages/History'));
+const Settings = lazy(() => import('./pages/Settings'));
+const ResetPassword = lazy(() => import('./pages/AuthLinkPages').then((m) => ({ default: m.ResetPassword })));
+const VerifyEmail = lazy(() => import('./pages/AuthLinkPages').then((m) => ({ default: m.VerifyEmail })));
+const Admin = lazy(() => import('./pages/Admin'));
+const Welcome = lazy(() => import('./pages/Welcome'));
+const Legal = lazy(() => import('./pages/Legal'));
 
 // Старият адрес /buy-coins (линкове, запазени страници, връщане от плащане) води към новата страница, с параметрите
 const BuyCoinsRedirect = () => {
@@ -20,6 +24,7 @@ const BuyCoinsRedirect = () => {
 function App() {
   return (
     <Router>
+      <Suspense fallback={<div className="min-h-screen bg-[#0B0616] flex items-center justify-center text-slate-400 text-sm">Зареждане…</div>}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
@@ -35,6 +40,7 @@ function App() {
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/legal/:doc" element={<Legal />} />
       </Routes>
+      </Suspense>
     </Router>
   );
 }
