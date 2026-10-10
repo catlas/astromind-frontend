@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Sparkles, Calendar, Clock, MessageSquare, User, Users, TrendingUp, Activity, Infinity } from 'lucide-react';
 import AstroChart from '../components/AstroChart';
-import DownloadPDFButton from '../components/DownloadPDFButton';
+import ReportText from '../components/ReportText';
+import ReportExport from '../components/ReportExport';
 import ChartSummary from '../components/ChartSummary';
 import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
 import BirthMoment from '../components/BirthMoment';
@@ -1543,16 +1544,10 @@ const GenerateReport = () => {
                   </div>
                 )}
 
-                {/* Download PDF Button */}
-                <DownloadPDFButton 
-                  fileName={`Astrology_Report_${name || 'Chart'}_${new Date().toISOString().split('T')[0]}.pdf`}
-                  userName={name.trim()}
-                  birthCity={placeLabel(birthPlace)}
-                  natalChart={result.natal_chart}
-                  natalAspects={result.natal_aspects || null}
-                  monthlyResults={monthlyResults}
-                  staticInterpretation={result.interpretation || null}
-                />
+                {/* Износ само на запазен (завършен) отчет: същият текст и дата като в Историята, без нов анализ */}
+                {activeJob?.status === 'succeeded' && activeJob?.report_id && (
+                  <ReportExport reportId={activeJob.report_id} />
+                )}
               </div>
             )}
           </div>
@@ -1581,19 +1576,7 @@ const GenerateReport = () => {
             )}
 
             {result && result.interpretation && (
-              <div className="prose prose-invert max-w-none">
-                <div 
-                  className="text-gray-200 leading-relaxed whitespace-pre-wrap"
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(result.interpretation
-                      .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold text-purple-400 mt-6 mb-3">$1</h2>')
-                      .replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold text-purple-300 mt-4 mb-2">$1</h3>')
-                      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                      .replace(/\n/g, '<br />')
-                    )
-                  }}
-                />
-              </div>
+              <ReportText text={result.interpretation} toc={activeJob?.status === 'succeeded'} />
             )}
           </div>
         </div>

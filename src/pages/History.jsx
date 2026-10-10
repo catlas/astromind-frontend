@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import DOMPurify from 'dompurify';
+import ReportText from '../components/ReportText';
+import ReportExport from '../components/ReportExport';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
 import { api, deleteReport, fetchReport, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 import { accessLabel, balanceOf, formatEur } from '../utils/money';
@@ -50,7 +51,7 @@ export default function History() {
       const full = await fetchReport(item.id);
       setViewingItem({ ...item, content: full.content });
     } catch {
-      setViewingItem({ ...item, content: '<p>Отчетът не можа да бъде зареден.</p>' });
+      setViewingItem({ ...item, content: 'Отчетът не можа да бъде зареден.', failed: true });
     } finally {
       setViewLoading(false);
     }
@@ -630,7 +631,7 @@ export default function History() {
       {/* View Report Modal */}
       {viewingItem && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-[#201428] rounded-xl border border-[#302240] w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+          <div className="bg-[#201428] rounded-xl border border-[#302240] w-full max-w-3xl max-h-[88vh] overflow-y-auto">
             <div className="p-6 border-b border-[#302240] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined" style={{ color: typeColors[viewingItem.type] || '#d4c8ed' }}>
@@ -650,36 +651,17 @@ export default function History() {
                 {viewLoading ? (
                   <p className="text-[#d4c8ed]">Зареждане…</p>
                 ) : (
-                  <div
-                    className="text-white leading-relaxed prose prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(viewingItem.content || 'Няма съдържание') }}
-                  />
+                  <ReportText text={viewingItem.content} toc />
                 )}
               </div>
             </div>
-            <div className="p-6 border-t border-[#302240] flex justify-end gap-3">
+            <div className="p-6 border-t border-[#302240] flex flex-wrap items-start justify-between gap-3">
+              {!viewLoading && !viewingItem.failed ? <ReportExport reportId={viewingItem.id} /> : <span />}
               <button
                 onClick={() => setViewingItem(null)}
                 className="px-4 py-2 rounded-lg text-[#d4c8ed] hover:text-white transition-colors"
               >
                 Затвори
-              </button>
-              <button
-                onClick={() => {
-                  api.post('/events', { name: 'report_downloaded' }).catch(() => {});
-                  const text = new DOMParser().parseFromString(DOMPurify.sanitize(viewingItem.content || ''), 'text/html').body.innerText;
-                  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `${viewingItem.label}.txt`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="px-4 py-2 rounded-lg bg-[#5211d4] text-white hover:bg-[#6b2ce0] transition-colors flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined text-sm">download</span>
-                Изтегли
               </button>
             </div>
           </div>

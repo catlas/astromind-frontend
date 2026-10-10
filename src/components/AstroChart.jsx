@@ -48,6 +48,57 @@ const PLANET_NAMES = {
   Chiron: 'Хирон',
 };
 
+// Планетите близо една до друга се разместват по кръга, за да не се застъпват символите; истинската позиция остава
+// отбелязана с чертичка на вътрешния пръстен. Връща { име: показван ъгъл }.
+const MIN_GAP = 9;
+export const spreadLongitudes = (longitudes, minGap = MIN_GAP) => {
+  const items = Object.entries(longitudes)
+    .map(([name, lon]) => ({ name, lon: ((lon % 360) + 360) % 360 }))
+    .sort((x, y) => x.lon - y.lon);
+  const n = items.length;
+  if (n < 2) return Object.fromEntries(items.map((i) => [i.name, i.lon]));
+
+  // Започваме след най-голямата празнина, за да не се чупи групата около 0°
+  let start = 0;
+  let widest = -1;
+  items.forEach((item, i) => {
+    const gap = (items[(i + 1) % n].lon - item.lon + 360) % 360 || 360;
+    if (gap > widest) { widest = gap; start = (i + 1) % n; }
+  });
+  const ordered = [...items.slice(start), ...items.slice(0, start)];
+  let offset = 0;
+  ordered.forEach((item, k) => {
+    if (k > 0 && item.lon + offset < ordered[k - 1].unwrapped) offset += 360;
+    item.unwrapped = item.lon + offset;
+  });
+
+  const shown = ordered.map((item) => item.unwrapped);
+  const forward = () => { for (let k = 1; k < n; k += 1) shown[k] = Math.max(shown[k], shown[k - 1] + minGap); };
+  for (let pass = 0; pass < 30; pass += 1) {
+    forward();
+    let changed = false;
+    let k = 0;
+    while (k < n) {
+      let j = k;
+      while (j + 1 < n && shown[j + 1] - shown[j] <= minGap + 1e-9) j += 1;
+      if (j > k) {
+        let sumTrue = 0;
+        let sumShown = 0;
+        for (let i = k; i <= j; i += 1) { sumTrue += ordered[i].unwrapped; sumShown += shown[i]; }
+        const delta = (sumTrue - sumShown) / (j - k + 1);       // групата се центрира около истинските позиции
+        if (Math.abs(delta) > 0.01) {
+          for (let i = k; i <= j; i += 1) shown[i] += delta;
+          changed = true;
+        }
+      }
+      k = j + 1;
+    }
+    if (!changed) break;
+  }
+  forward();
+  return Object.fromEntries(ordered.map((item, k) => [item.name, ((shown[k] % 360) + 360) % 360]));
+};
+
 export default function AstroChart({ data }) {
   if (!data || !data.planets || !data.houses) {
     return (
@@ -108,19 +159,31 @@ export default function AstroChart({ data }) {
   // Рисуване на планетите
   const renderPlanets = () => {
     const planets = data.planets || {};
+    const placed = Object.fromEntries(Object.entries(planets)
+      .filter(([, d]) => d && d.longitude !== null && d.longitude !== undefined)
+      .map(([name, d]) => [name, d.longitude]));
+    const display = spreadLongitudes(placed);
     return Object.entries(planets).map(([planetName, planetData]) => {
       if (!planetData || planetData.longitude === null || planetData.longitude === undefined) {
         return null;
       }
 
       const longitude = planetData.longitude;
-      const pos = polarToCartesian(centerX, centerY, planetRadius, longitude);
+      const shownAt = display[planetName] ?? longitude;
+      const pos = polarToCartesian(centerX, centerY, planetRadius, shownAt);
+      const tickFrom = polarToCartesian(centerX, centerY, innerRadius, longitude);
+      const tickTo = polarToCartesian(centerX, centerY, innerRadius + 12, longitude);
+      const degreePos = polarToCartesian(centerX, centerY, planetRadius - 36, shownAt);
+      const degree = `${Math.floor(longitude % 30)}°${planetData.speed < 0 ? '℞' : ''}`;
       const symbol = PLANET_SYMBOLS[planetName] || '•';
       const name = PLANET_NAMES[planetName] || planetName;
       const speed = planetData.speed ? planetData.speed.toFixed(2) : 'N/A';
 
       return (
         <g key={planetName}>
+          <line x1={tickFrom.x} y1={tickFrom.y} x2={tickTo.x} y2={tickTo.y} stroke="#FBBF24" strokeWidth="2" />
+          <text x={degreePos.x} y={degreePos.y} textAnchor="middle" dominantBaseline="middle"
+            className="fill-slate-300 text-xs pointer-events-none">{degree}</text>
           <circle
             cx={pos.x}
             cy={pos.y}
