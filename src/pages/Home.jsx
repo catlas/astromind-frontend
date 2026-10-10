@@ -4,6 +4,18 @@ import axios from 'axios';
 import { getApiBaseUrl } from '../utils/auth';
 import { FALLBACK_LIMITS, FALLBACK_PRICES, FALLBACK_SIGNUP_GIFT, FALLBACK_TOPUPS, formatEur } from '../utils/money';
 
+// Нощно небе от CSS: без външна снимка (повече поверителност, по-малко трафик и политиката за съдържанието не пуска чужди картинки)
+const SKY_BACKGROUND = [
+  'radial-gradient(1.5px 1.5px at 18% 22%, rgba(255,255,255,.9), transparent)',
+  'radial-gradient(1px 1px at 72% 18%, rgba(255,255,255,.8), transparent)',
+  'radial-gradient(1.5px 1.5px at 40% 64%, rgba(255,255,255,.7), transparent)',
+  'radial-gradient(1px 1px at 86% 58%, rgba(255,255,255,.8), transparent)',
+  'radial-gradient(1px 1px at 12% 82%, rgba(255,255,255,.7), transparent)',
+  'radial-gradient(ellipse at 28% 18%, rgba(124,58,237,.55), transparent 55%)',
+  'radial-gradient(ellipse at 82% 72%, rgba(37,99,235,.35), transparent 50%)',
+  '#0B0616',
+].join(', ');
+
 const Home = () => {
   const navigate = useNavigate();
   const [showAuth, setShowAuth] = useState(false);
@@ -278,7 +290,7 @@ const Home = () => {
             <div 
               className="absolute inset-0 bg-cover bg-center opacity-60"
               style={{
-                backgroundImage: "url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=2000&auto=format&fit=crop')"
+                backgroundImage: SKY_BACKGROUND
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-[#0B0616] via-[#13111C]/80 to-[#13111C]/60 opacity-100"></div>
