@@ -7,6 +7,8 @@ import ReportExport from '../components/ReportExport';
 import ChartSummary from '../components/ChartSummary';
 import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
 import BirthMoment from '../components/BirthMoment';
+import ForecastZone from '../components/ForecastZone';
+import { browserZone, nowInZone } from '../utils/forecastZone';
 import { emptyPlace, normalizePlace, placeFromParts, placeFromProfile, placeLabel } from '../utils/birthPlace';
 import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, apiErrorMessage, fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
@@ -111,6 +113,11 @@ const GenerateReport = () => {
     target_date: '',
     target_time: '',
   });
+  // Часова зона на прогнозата: датата и часът са местни за нея (по подразбиране зоната на устройството, видима и сменяема)
+  const [forecastZone, setForecastZone] = useState(browserZone);
+  const [targetFold, setTargetFold] = useState(null);           // избор при повтарящ се прогнозен час
+  const [targetState, setTargetState] = useState({ blocking: false, zone: '' });
+  const [targetTouched, setTargetTouched] = useState(false);    // датата или часът са сменени на ръка: зоната не ги пипа
   const [isDynamic, setIsDynamic] = useState(false);
   const [endDate, setEndDate] = useState('');
   const [reportType, setReportType] = useState('general');
@@ -181,16 +188,13 @@ const GenerateReport = () => {
 
     loadUser();
 
-    // Инициализация на транзитна дата с текущата дата
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const currentTime = now.toTimeString().slice(0, 5);
-    
+    // Начални дата и час: местни за зоната на прогнозата (не UTC дата, смесена с местен час)
+    const here = nowInZone(browserZone());
     if (!transitData.target_date) {
       setTransitData(prev => ({
         ...prev,
-        target_date: today,
-        target_time: currentTime,
+        target_date: here.date,
+        target_time: here.time,
       }));
     }
     return () => {
@@ -238,6 +242,12 @@ const GenerateReport = () => {
   const selectedProfile = savedProfiles.find((p) => String(p.id) === profileChoice) || null;
   const partnerProfile = savedProfiles.find((p) => String(p.id) === partnerChoice) || null;
 
+  useEffect(() => {
+    if (targetTouched) return;
+    const here = nowInZone(forecastZone);
+    setTransitData((prev) => ({ ...prev, target_date: here.date, target_time: here.time }));
+  }, [forecastZone, targetTouched]);
+
   // Горна граница на периода на прогнозата (календарни месеци), по настройките на сървъра
   const forecastLimits = { ...FALLBACK_LIMITS, ...(billingConfig?.limits || {}) };
   const forecastMaxMonths = enablePartner ? forecastLimits.forecast_max_months_pair : forecastLimits.forecast_max_months_single;
@@ -251,7 +261,8 @@ const GenerateReport = () => {
   const suggestedRelationship = suggestContext(selectedProfile, partnerProfile);
   const effectiveRelationship = relationship ?? suggestedRelationship;
   const sameProfile = Boolean(enablePartner && profileChoice && partnerChoice && profileChoice === partnerChoice);
-  const formBlocked = sameProfile || birthState.blocking || (enablePartner && partnerState.blocking);
+  const formBlocked = sameProfile || birthState.blocking || (enablePartner && partnerState.blocking)
+    || (enableTransit && !isDynamic && targetState.blocking);
 
   // Избор на партньор от „Профили“: данните му се попълват и остават редактируеми
   const applyPartnerProfile = (profile) => {
@@ -696,6 +707,7 @@ const GenerateReport = () => {
         const currentYear = new Date().getFullYear();
         requestData.target_date = transitData.target_date || `${currentYear}-01-01`;
         requestData.end_date = endDate;
+        requestData.forecast_timezone = forecastZone;
       } else {
         // Стандартен режим - транзитни данни
         let targetDatePayload = null;
@@ -703,12 +715,14 @@ const GenerateReport = () => {
         
         if (enableTransit) {
           // Ако checkbox е активиран, използваме предоставената дата или текущата дата/час
-          const now = new Date();
-          targetDatePayload = transitData.target_date || now.toISOString().split('T')[0];
-          targetTimePayload = transitData.target_time || now.toTimeString().slice(0, 5);
-          
+          const here = nowInZone(forecastZone);
+          targetDatePayload = transitData.target_date || here.date;
+          targetTimePayload = transitData.target_time || here.time;
+
           requestData.target_date = targetDatePayload;
           requestData.target_time = targetTimePayload;
+          requestData.forecast_timezone = forecastZone;
+          if (targetFold !== null) requestData.target_fold = targetFold;
         }
         // Ако checkbox НЕ е активиран, target_date и target_time остават undefined (не се изпращат)
       }
@@ -1097,7 +1111,7 @@ const GenerateReport = () => {
                           <input
                             type="date"
                             value={transitData.target_date}
-                            onChange={(e) => setTransitData(prev => ({ ...prev, target_date: e.target.value }))}
+                            onChange={(e) => { setTargetTouched(true); setTransitData(prev => ({ ...prev, target_date: e.target.value })); }}
                             className="w-full px-4 py-2 bg-slate-700/50 border border-blue-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
                           />
                         </div>
@@ -1120,8 +1134,9 @@ const GenerateReport = () => {
                       </div>
                       <p className="text-xs text-gray-400">
                         Периодът може да е най-много {forecastMaxMonths} месеца {forecastWho}: крайната дата е най-късно {formatBgDate(forecastMaxEnd)}.
-                        {birthState.zone && ` Часовете на събитията са по часовата зона на мястото на анализа: ${birthState.zone}.`}
                       </p>
+                      <ForecastZone zone={forecastZone} birthZone={birthState.zone}
+                        onChange={(zone) => { setForecastZone(zone); setTargetFold(null); }} />
                     </div>
                   )}
                 </div>
@@ -1156,7 +1171,7 @@ const GenerateReport = () => {
                           <input
                             type="date"
                             value={transitData.target_date}
-                            onChange={(e) => setTransitData(prev => ({ ...prev, target_date: e.target.value }))}
+                            onChange={(e) => { setTargetTouched(true); setTargetFold(null); setTransitData(prev => ({ ...prev, target_date: e.target.value })); }}
                             className="w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
                           />
                         </div>
@@ -1169,8 +1184,22 @@ const GenerateReport = () => {
                           <input
                             type="time"
                             value={transitData.target_time}
-                            onChange={(e) => setTransitData(prev => ({ ...prev, target_time: e.target.value }))}
+                            onChange={(e) => { setTargetTouched(true); setTargetFold(null); setTransitData(prev => ({ ...prev, target_time: e.target.value })); }}
                             className="w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-2">
+                          <ForecastZone zone={forecastZone} birthZone={birthState.zone}
+                            onChange={(zone) => { setForecastZone(zone); setTargetFold(null); }} />
+                          <BirthMoment
+                            date={transitData.target_date}
+                            time={transitData.target_time}
+                            timezone={forecastZone}
+                            fold={targetFold}
+                            onFold={setTargetFold}
+                            onTime={(value) => { setTargetTouched(true); setTransitData((prev) => ({ ...prev, target_time: value })); }}
+                            onState={setTargetState}
+                            tone="forecast"
                           />
                         </div>
                       </div>
@@ -1453,7 +1482,9 @@ const GenerateReport = () => {
                   <p className="text-xs text-center text-amber-200">
                     {sameProfile
                       ? 'Изберете друг профил за втория човек.'
-                      : 'Поправете или изберете часа на раждане (виж бележката под него), за да продължите.'}
+                      : (!birthState.blocking && !(enablePartner && partnerState.blocking)
+                        ? 'Поправете или изберете часа на прогнозата (виж бележката под него), за да продължите.'
+                        : 'Поправете или изберете часа на раждане (виж бележката под него), за да продължите.')}
                   </p>
                 )}
 

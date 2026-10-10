@@ -28,8 +28,9 @@ export const apiErrorMessage = (err, fallback = 'Възникна грешка. 
 };
 
 // Състояние на местния час на раждане: зона, отместване, несъществуващ или повтарящ се час (Фаза 12)
-export const fetchTimeCheck = async ({ date, time, lat, lon, fold }) => {
-  const params = { date, time, lat, lon };
+export const fetchTimeCheck = async ({ date, time, lat, lon, fold, timezone }) => {
+  // Зоната е по мястото (рождени данни) или зададена изрично (часова зона на прогнозата)
+  const params = timezone ? { date, time, timezone } : { date, time, lat, lon };
   if (fold === 0 || fold === 1) params.fold = fold;
   return (await api.get('/time-check', { params, timeout: 10000 })).data;
 };

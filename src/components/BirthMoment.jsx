@@ -8,20 +8,21 @@ import { fetchTimeCheck } from '../utils/api';
 // onState({ blocking, zone }) казва на формата дали да спре изпращането и в коя зона е мястото.
 // fold: null (няма избор), 0 или 1; onFold го сменя; onTime записва предложен валиден час.
 // Формата сама нулира избора, когато човекът промени датата, часа или мястото (избор от профил го запазва).
-export default function BirthMoment({ date, time, lat, lon, unknown = false, fold = null, onFold, onTime, onState, tone = 'purple' }) {
+export default function BirthMoment({ date, time, lat, lon, timezone = '', unknown = false, fold = null, onFold, onTime, onState, tone = 'purple' }) {
   const [stored, setStored] = useState(null);
   const [failed, setFailed] = useState(false);
   const seq = useRef(0);
 
   const latNum = Number.parseFloat(lat);
   const lonNum = Number.parseFloat(lon);
-  const placeOk = Number.isFinite(latNum) && Number.isFinite(lonNum) && latNum >= -90 && latNum <= 90
-    && lonNum >= -180 && lonNum <= 180;
+  // С timezone (прогнозен момент) зоната е зададена изрично и координатите не са нужни
+  const placeOk = Boolean(timezone) || (Number.isFinite(latNum) && Number.isFinite(lonNum) && latNum >= -90 && latNum <= 90
+    && lonNum >= -180 && lonNum <= 180);
   const ready = !unknown && Boolean(date) && Boolean(time) && placeOk;
   // При неизвестен час пак питаме за зоната (с пладне): тя е нужна за часовете в прогнозата, но не се показва тук
   const zoneOnly = unknown && Boolean(date) && placeOk;
   // Отговорът важи само за въпроса, на който е даден: при промяна на полетата старият не се показва
-  const requestKey = `${date}|${ready ? time : '12:00'}|${latNum}|${lonNum}|${ready ? fold : null}`;
+  const requestKey = `${date}|${ready ? time : '12:00'}|${latNum}|${lonNum}|${timezone}|${ready ? fold : null}`;
   const result = stored && stored.key === requestKey ? stored.data : null;
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function BirthMoment({ date, time, lat, lon, unknown = false, fol
     const mine = ++seq.current;
     const timer = setTimeout(async () => {
       try {
-        const data = await fetchTimeCheck({ date, time: ready ? time : '12:00', lat: latNum, lon: lonNum, fold: ready ? fold : null });
+        const data = await fetchTimeCheck({ date, time: ready ? time : '12:00', lat: latNum, lon: lonNum, timezone: timezone || undefined, fold: ready ? fold : null });
         if (mine !== seq.current) return;         // по-нова заявка е изпреварила тази
         setStored({ key: requestKey, data });
         setFailed(false);
@@ -44,7 +45,7 @@ export default function BirthMoment({ date, time, lat, lon, unknown = false, fol
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [ready, zoneOnly, date, time, latNum, lonNum, fold]);
+  }, [ready, zoneOnly, date, time, latNum, lonNum, timezone, fold]);
 
   const blocking = ready && Boolean(result) && (result.status === 'nonexistent' || (result.status === 'ambiguous' && fold === null));
   useEffect(() => {
