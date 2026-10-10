@@ -7,6 +7,7 @@ import { FALLBACK_PRICES, balanceOf, formatEur, formatSignedEur, giftOf, paidOf 
 const REASON_LABELS = {
   signup_gift: 'Подарък при регистрация',
   signup_bonus: 'Подарък при регистрация',
+  legacy_gift_topup: 'Подарък за съществуващите акаунти',
   opening_balance: 'Начален баланс',
   purchase: 'Зареждане на баланс',
   analysis: 'Анализ',
