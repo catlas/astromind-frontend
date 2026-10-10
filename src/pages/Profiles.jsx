@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
 import { api, apiErrorMessage, fetchProfiles, migrateLocalData } from '../utils/api';
+import BirthMoment from '../components/BirthMoment';
 import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
 import { emptyPlace, parseCoordinates, placeFromProfile, placeLabel } from '../utils/birthPlace';
 import { accessLabel, balanceOf, formatEur } from '../utils/money';
@@ -42,6 +43,7 @@ const Profiles = () => {
   });
   // Място на раждане: град от списъка или „Друг“ (с търсене с AI), плюс ширина и дължина
   const [place, setPlace] = useState(emptyPlace());
+  const [birthFold, setBirthFold] = useState(null);   // избор при повтарящ се час (връщане на часовника назад)
 
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -93,6 +95,7 @@ const Profiles = () => {
       birth_time: profile.birth_time || '',
       unknown_time: profile.unknown_time,
     });
+    setBirthFold(profile.settings?.birthFold ?? null);
     setPlace(placeFromProfile(profile));
   };
 
@@ -117,6 +120,7 @@ const Profiles = () => {
       birth_time: '',
       unknown_time: false,
     });
+    setBirthFold(null);
     setPlace(emptyPlace());
   };
 
@@ -139,7 +143,10 @@ const Profiles = () => {
       birth_place: placeLabel(place),
       lat: coords.lat,
       lon: coords.lon,
-      settings: existing?.settings,
+      settings: (() => {
+        const { birthFold: _old, ...rest } = existing?.settings || {};
+        return form.unknown_time || birthFold === null ? rest : { ...rest, birthFold };
+      })(),
     };
     setSaving(true);
     setSaveError('');
@@ -160,12 +167,14 @@ const Profiles = () => {
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+    if (field === 'birth_date' || field === 'birth_time' || field === 'unknown_time') setBirthFold(null);   // нов момент: старият избор не важи
   };
 
   // Старата грешка за координатите се маха, щом потребителят промени мястото
   const handlePlaceChange = (next) => {
     setSaveError('');
     setPlace(next);
+    setBirthFold(null);
   };
 
   if (!user) return null;
@@ -601,6 +610,20 @@ const Profiles = () => {
                       className={`w-full px-3 py-2.5 rounded-lg bg-[#131118] border border-slate-700 text-white text-sm focus:border-[#5211d4] focus:outline-none transition-colors ${
                         form.unknown_time ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
+                    />
+                  </div>
+
+                  <div className="mb-4">
+                    <BirthMoment
+                      date={form.birth_date}
+                      time={form.birth_time}
+                      lat={place.lat}
+                      lon={place.lon}
+                      unknown={form.unknown_time}
+                      fold={birthFold}
+                      onFold={setBirthFold}
+                      onTime={(value) => handleChange('birth_time', value)}
+                      tone="profile"
                     />
                   </div>
 

@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Sparkles, Calendar, Clock, MessageSquare, User, TrendingUp, Heart, Activity, Infinity } from 'lucide-react';
+import { Loader2, Sparkles, Calendar, Clock, MessageSquare, User, Users, TrendingUp, Activity, Infinity } from 'lucide-react';
 import AstroChart from '../components/AstroChart';
 import DownloadPDFButton from '../components/DownloadPDFButton';
 import ChartSummary from '../components/ChartSummary';
 import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
+import BirthMoment from '../components/BirthMoment';
 import { emptyPlace, normalizePlace, placeFromParts, placeFromProfile, placeLabel } from '../utils/birthPlace';
 import { clearSessionAndRedirect, verifySession } from '../utils/auth';
-import { api, fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
+import { api, apiErrorMessage, fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
+import { CONTEXT_OPTIONS, relationLabel, suggestContext } from '../utils/relations';
 import { accessLabel, availableFor, balanceOf, formatEur, periodMonths, quoteFor, withBalance } from '../utils/money';
 import {
   STAGE_MESSAGES, STAGE_STEPS, cancelJob, createJob, fetchJob, fetchJobLimits, forgetJob, isActive, newKey,
@@ -99,6 +101,9 @@ const GenerateReport = () => {
     time: '',
     question: '',
   });
+  const [unknownTime, setUnknownTime] = useState(false);     // часът на раждане е неизвестен: без Асцендент, MC и домове
+  const [birthFold, setBirthFold] = useState(null);          // избор при повтарящ се час: 0 първо, 1 второ преминаване
+  const [birthState, setBirthState] = useState({ blocking: false, zone: '' });
 
   const [enableTransit, setEnableTransit] = useState(false);
   const [transitData, setTransitData] = useState({
@@ -118,6 +123,11 @@ const GenerateReport = () => {
     partner_time: '',
   });
   const [partnerPlace, setPartnerPlace] = useState(emptyPlace());
+  const [partnerUnknownTime, setPartnerUnknownTime] = useState(false);
+  const [partnerFold, setPartnerFold] = useState(null);
+  const [partnerState, setPartnerState] = useState({ blocking: false, zone: '' });
+  // Отношения между двамата: null = още не е избрано (важи предложението по групата на профила), '' = общо взаимодействие
+  const [relationship, setRelationship] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -236,6 +246,12 @@ const GenerateReport = () => {
 
   const emptyPartnerData = { partner_name: '', partner_date: '', partner_time: '' };
 
+  // Отношения между двамата: избраното от човека, иначе предложение по групата на втория профил (само когато първият е основният)
+  const suggestedRelationship = suggestContext(selectedProfile, partnerProfile);
+  const effectiveRelationship = relationship ?? suggestedRelationship;
+  const sameProfile = Boolean(enablePartner && profileChoice && partnerChoice && profileChoice === partnerChoice);
+  const formBlocked = sameProfile || birthState.blocking || (enablePartner && partnerState.blocking);
+
   // Избор на партньор от „Профили“: данните му се попълват и остават редактируеми
   const applyPartnerProfile = (profile) => {
     setPartnerChoice(String(profile.id));
@@ -245,6 +261,8 @@ const GenerateReport = () => {
       partner_time: profile.birth_time || '',
     });
     setPartnerPlace(placeFromProfile(profile));
+    setPartnerUnknownTime(Boolean(profile.unknown_time));
+    setPartnerFold(profile.settings?.birthFold ?? null);
   };
 
   // Партньорът от запазените настройки на профила. Ако името му съвпада с профил,
@@ -262,6 +280,8 @@ const GenerateReport = () => {
       partner_date: saved.partner_date || '',
       partner_time: saved.partner_time || '',
     });
+    setPartnerUnknownTime(Boolean(settings.partnerUnknownTime));
+    setPartnerFold(settings.partnerFold ?? null);
     // Новият формат пази partnerPlace; старият - градът и координатите отделно
     setPartnerPlace(
       settings.partnerPlace
@@ -281,6 +301,9 @@ const GenerateReport = () => {
       time: profile.birth_time || '',
       question: settings.question || '',
     });
+    setUnknownTime(Boolean(profile.unknown_time));
+    setBirthFold(settings.birthFold ?? null);
+    setRelationship(settings.relationship ?? null);
     setBirthPlace(placeFromProfile(profile));
     setEnableTransit(Boolean(settings.enableTransit));
     if (settings.transitData) setTransitData(settings.transitData);
@@ -295,6 +318,8 @@ const GenerateReport = () => {
       // Ръчно въвеждане: започваме с празни данни за раждане
       setName('');
       setFormData((prev) => ({ ...prev, date: '', time: '' }));
+      setUnknownTime(false);
+      setBirthFold(null);
       setBirthPlace(emptyPlace());
       return;
     }
@@ -305,9 +330,12 @@ const GenerateReport = () => {
   const handlePartnerProfileChange = (e) => {
     const value = e.target.value;
     setPartnerChoice(value);
+    setRelationship(null);          // нов втори човек: важи предложението по неговата група
     if (!value) {
       setPartnerData(emptyPartnerData);
       setPartnerPlace(emptyPlace());
+      setPartnerUnknownTime(false);
+      setPartnerFold(null);
       return;
     }
     const profile = savedProfiles.find((p) => String(p.id) === value);
@@ -337,6 +365,10 @@ const GenerateReport = () => {
       partnerData,
       partnerPlace,
       enablePartner,
+      partnerUnknownTime,
+      partnerFold,
+      relationship: relationship ?? undefined,
+      birthFold,
     };
     try {
       if (selectedProfile) {
@@ -358,8 +390,8 @@ const GenerateReport = () => {
           relation: 'self',
           gender: null,
           birth_date: formData.date,
-          birth_time: formData.time || '',
-          unknown_time: !formData.time,
+          birth_time: unknownTime ? '' : (formData.time || ''),
+          unknown_time: unknownTime || !formData.time,
           birth_place: placeLabel(birthPlace),
           lat: coords.lat,
           lon: coords.lon,
@@ -380,6 +412,7 @@ const GenerateReport = () => {
       ...prev,
       [name]: value
     }));
+    if (name === 'date' || name === 'time') setBirthFold(null);       // нов момент: старият избор на преминаване не важи
   };
 
   const handlePartnerChange = (e) => {
@@ -388,6 +421,17 @@ const GenerateReport = () => {
       ...prev,
       [name]: value
     }));
+    if (name === 'partner_date' || name === 'partner_time') setPartnerFold(null);
+  };
+
+  // Ново място на раждане от потребителя: изборът при повтарящ се час вече не важи
+  const changeBirthPlace = (next) => {
+    setBirthPlace(next);
+    setBirthFold(null);
+  };
+  const changePartnerPlace = (next) => {
+    setPartnerPlace(next);
+    setPartnerFold(null);
   };
 
   // ---------------------------------------------------------------------------
@@ -594,7 +638,10 @@ const GenerateReport = () => {
     let attached = false;     // докато задачата работи, екранът остава в състояние на изчакване
     try {
       // Валидация
-      if (!formData.date || !formData.time || !birthPlace.lat || !birthPlace.lon) {
+      if (sameProfile) {
+        throw new Error('Първият и вторият човек са един и същ профил. Изберете друг профил за втория човек.');
+      }
+      if (!formData.date || (!unknownTime && !formData.time) || !birthPlace.lat || !birthPlace.lon) {
         throw new Error('Моля попълнете всички задължителни полета');
       }
 
@@ -625,12 +672,18 @@ const GenerateReport = () => {
       const requestData = {
         name: name.trim() || undefined,
         date: formData.date,
-        time: formData.time,
         lat: lat,
         lon: lon,
         question: formData.question || undefined,
         report_type: reportType,
       };
+      if (unknownTime) {
+        requestData.birth_time_known = false;
+      } else {
+        requestData.time = formData.time;
+        if (birthFold !== null) requestData.birth_fold = birthFold;
+      }
+      if (selectedProfile) requestData.profile_id = selectedProfile.id;
       const firstGender = knownGender(selectedProfile, name);
       if (firstGender) requestData.gender = firstGender;
 
@@ -660,16 +713,23 @@ const GenerateReport = () => {
       }
 
       // Добавяне на partner данни, ако са активирани
-      if (enablePartner && partnerData.partner_date && partnerData.partner_time && partnerPlace.lat && partnerPlace.lon) {
+      if (enablePartner && partnerData.partner_date && (partnerData.partner_time || partnerUnknownTime) && partnerPlace.lat && partnerPlace.lon) {
         const partnerLat = parseFloat(partnerPlace.lat);
         const partnerLon = parseFloat(partnerPlace.lon);
         
         if (!isNaN(partnerLat) && !isNaN(partnerLon)) {
           requestData.partner_name = partnerData.partner_name.trim() || undefined;
           requestData.partner_date = partnerData.partner_date;
-          requestData.partner_time = partnerData.partner_time;
+          if (partnerUnknownTime) {
+            requestData.partner_time_known = false;
+          } else {
+            requestData.partner_time = partnerData.partner_time;
+            if (partnerFold !== null) requestData.partner_fold = partnerFold;
+          }
           requestData.partner_lat = partnerLat;
           requestData.partner_lon = partnerLon;
+          if (partnerProfile) requestData.partner_profile_id = partnerProfile.id;
+          if (effectiveRelationship) requestData.relationship = effectiveRelationship;
           const secondGender = knownGender(partnerProfile, partnerData.partner_name);
           if (secondGender) requestData.partner_gender = secondGender;
         }
@@ -690,7 +750,9 @@ const GenerateReport = () => {
       if ((err?.response?.status || err?.status) === 402) setNeedsBalance(true);
 
       // Извличане на съобщението за грешка, премахвайки префикси като "Неочаквана грешка: 400:"
-      let errorMessage = err.response?.data?.detail || err.message || 'Възникна грешка при изчисляване на картата';
+      let errorMessage = err.response
+        ? apiErrorMessage(err, 'Данните не са приети. Проверете полетата и опитайте отново.')
+        : (err.message || 'Възникна грешка при изчисляване на картата');
       if (err.isAxiosError && !err.response) {
         errorMessage = 'Няма връзка със сървъра. Опитайте отново след малко: повторното изпращане няма да направи втори анализ.';
       }
@@ -939,7 +1001,7 @@ const GenerateReport = () => {
                 </div>
 
                 {/* Birth place: град от списъка или „Друг“ (търсене с AI или ръчно) */}
-                <BirthPlaceSelect key={`person-${profileChoice}`} value={birthPlace} onChange={setBirthPlace} variant="purple" label="Град на раждане" />
+                <BirthPlaceSelect key={`person-${profileChoice}`} value={birthPlace} onChange={changeBirthPlace} variant="purple" label="Град на раждане" />
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -958,23 +1020,42 @@ const GenerateReport = () => {
                   
                   <div>
                     <label className="block text-sm font-medium mb-2 text-gray-300">
-                      Час на раждане <span className="text-red-400">*</span>
+                      Час на раждане {!unknownTime && <span className="text-red-400">*</span>}
                     </label>
                     <input
                       type="time"
                       name="time"
                       value={formData.time}
                       onChange={handleChange}
-                      required
-                      className="w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
+                      required={!unknownTime}
+                      disabled={unknownTime}
+                      className={`w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white ${unknownTime ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />
+                    <label className="mt-2 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                      <input type="checkbox" checked={unknownTime} onChange={(e) => { setUnknownTime(e.target.checked); setBirthFold(null); }}
+                        className="w-3.5 h-3.5 rounded bg-slate-700/50 border-purple-800/30 text-purple-600" />
+                      Не знам часа на раждане
+                    </label>
                   </div>
                 </div>
+
+                <BirthMoment
+                  date={formData.date}
+                  time={formData.time}
+                  lat={birthPlace.lat}
+                  lon={birthPlace.lon}
+                  unknown={unknownTime}
+                  fold={birthFold}
+                  onFold={setBirthFold}
+                  onTime={(value) => setFormData((prev) => ({ ...prev, time: value }))}
+                  onState={setBirthState}
+                  tone="purple"
+                />
 
                 {/* Ширина и дължина: попълват се от града или от AI и могат да се коригират */}
                 <BirthCoordinates
                   value={birthPlace}
-                  onChange={setBirthPlace}
+                  onChange={changeBirthPlace}
                   variant="purple"
                   required
                   names={{ lat: 'lat', lon: 'lon' }}
@@ -1038,6 +1119,7 @@ const GenerateReport = () => {
                       </div>
                       <p className="text-xs text-gray-400">
                         Периодът може да е най-много {forecastMaxMonths} месеца {forecastWho}: крайната дата е най-късно {formatBgDate(forecastMaxEnd)}.
+                        {birthState.zone && ` Часовете на събитията са по часовата зона на мястото на анализа: ${birthState.zone}.`}
                       </p>
                     </div>
                   )}
@@ -1106,12 +1188,12 @@ const GenerateReport = () => {
                       className="w-4 h-4 rounded bg-slate-700/50 border-pink-800/30 text-pink-600 focus:ring-pink-500"
                     />
                     <label htmlFor="enablePartner" className="text-sm font-medium text-gray-300 flex items-center gap-2 cursor-pointer">
-                      <Heart className="w-4 h-4 text-pink-400" />
-                      Добави партньор / Режим на съвместимост
+                      <Users className="w-4 h-4 text-pink-400" />
+                      Анализ с друг човек
                     </label>
                   </div>
                   <p className="text-xs text-gray-400 italic mb-4 ml-6">
-                    Активира анализ на съвместимост (synastry) или прогноза за връзка между двама души.
+                    Изберете близък, приятел, дете, роднина или партньор. Анализът отчита вида на отношенията и избраната тема.
                   </p>
 
                   {enablePartner && (
@@ -1120,7 +1202,7 @@ const GenerateReport = () => {
                       <div>
                         <label className="block text-sm font-medium mb-2 text-gray-300">
                           <User className="w-4 h-4 inline mr-1" />
-                          Име на партньора
+                          Втори човек
                         </label>
                         <select
                           value={partnerProfile ? partnerChoice : ''}
@@ -1130,10 +1212,15 @@ const GenerateReport = () => {
                           <option value="">Ръчно въвеждане (без профил)</option>
                           {savedProfiles.map((p) => (
                             <option key={p.id} value={String(p.id)}>
-                              {p.name}
+                              {p.name} · {relationLabel(p.relation)}
                             </option>
                           ))}
                         </select>
+                        {sameProfile && (
+                          <p className="mt-2 text-sm text-red-300" role="alert">
+                            Първият и вторият човек са един и същ профил. Изберете друг профил за втория човек.
+                          </p>
+                        )}
                         {!partnerProfile && (
                           <input
                             type="text"
@@ -1141,14 +1228,32 @@ const GenerateReport = () => {
                             value={partnerData.partner_name}
                             onChange={handlePartnerChange}
                             maxLength={100}
-                            placeholder="Име на партньора..."
+                            placeholder="Име на втория човек..."
                             className="mt-2 w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white"
                           />
                         )}
                       </div>
 
+                      {/* Отношения между двамата: важат за целия анализ; без избор е общо взаимодействие */}
+                      <div>
+                        <label htmlFor="relationship" className="block text-sm font-medium mb-2 text-gray-300">Какви са отношенията ви</label>
+                        <select
+                          id="relationship"
+                          value={effectiveRelationship}
+                          onChange={(e) => setRelationship(e.target.value)}
+                          className="w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white"
+                        >
+                          {CONTEXT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-400">
+                          {relationship === null && suggestedRelationship
+                            ? `Предложено по групата „${relationLabel(partnerProfile?.relation)}“ на профила. Можете да го промените; важи само за този анализ.`
+                            : 'Важи за целия анализ. Без избор анализът е общо взаимодействие и не предполага романтика.'}
+                        </p>
+                      </div>
+
                       {/* Partner city */}
-                      <BirthPlaceSelect key={`partner-${partnerChoice}`} value={partnerPlace} onChange={setPartnerPlace} variant="pink" label="Град на раждане на партньора" />
+                      <BirthPlaceSelect key={`partner-${partnerChoice}`} value={partnerPlace} onChange={changePartnerPlace} variant="pink" label="Град на раждане на втория човек" />
 
                       {/* Partner Date and Time */}
                       <div className="grid grid-cols-2 gap-4">
@@ -1168,23 +1273,42 @@ const GenerateReport = () => {
                         
                         <div>
                           <label className="block text-sm font-medium mb-2 text-gray-300">
-                            Час на раждане <span className="text-red-400">*</span>
+                            Час на раждане {!partnerUnknownTime && <span className="text-red-400">*</span>}
                           </label>
                           <input
                             type="time"
                             name="partner_time"
                             value={partnerData.partner_time}
                             onChange={handlePartnerChange}
-                            required={enablePartner}
-                            className="w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white"
+                            required={enablePartner && !partnerUnknownTime}
+                            disabled={partnerUnknownTime}
+                            className={`w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white ${partnerUnknownTime ? 'opacity-50 cursor-not-allowed' : ''}`}
                           />
+                          <label className="mt-2 flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input type="checkbox" checked={partnerUnknownTime} onChange={(e) => { setPartnerUnknownTime(e.target.checked); setPartnerFold(null); }}
+                              className="w-3.5 h-3.5 rounded bg-slate-700/50 border-pink-800/30 text-pink-600" />
+                            Не знам часа на раждане
+                          </label>
                         </div>
                       </div>
+
+                      <BirthMoment
+                        date={partnerData.partner_date}
+                        time={partnerData.partner_time}
+                        lat={partnerPlace.lat}
+                        lon={partnerPlace.lon}
+                        unknown={partnerUnknownTime}
+                        fold={partnerFold}
+                        onFold={setPartnerFold}
+                        onTime={(value) => setPartnerData((prev) => ({ ...prev, partner_time: value }))}
+                        onState={setPartnerState}
+                        tone="pink"
+                      />
 
                       {/* Partner Coordinates */}
                       <BirthCoordinates
                         value={partnerPlace}
-                        onChange={setPartnerPlace}
+                        onChange={changePartnerPlace}
                         variant="pink"
                         required
                         names={{ lat: 'partner_lat', lon: 'partner_lon' }}
@@ -1202,10 +1326,12 @@ const GenerateReport = () => {
                     name="question"
                     value={formData.question}
                     onChange={handleChange}
+                    maxLength={1500}
                     rows="3"
                     placeholder="Задайте конкретен въпрос за интерпретация..."
                     className="w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white resize-none"
                   />
+                  <p className="mt-1 text-xs text-right text-gray-500">{formData.question.length}/1500</p>
                 </div>
 
                 {/* Report Type Selector */}
@@ -1282,7 +1408,7 @@ const GenerateReport = () => {
 
                 <button
                   type="submit"
-                  disabled={loading || (jobLimits ? !jobLimits.can_start : false)}
+                  disabled={loading || formBlocked || (jobLimits ? !jobLimits.can_start : false)}
                   className={`w-full font-bold py-3 px-4 rounded-lg shadow-lg transition-all flex justify-center items-center gap-2
                     ${loading 
                       ? 'bg-gray-600 cursor-not-allowed opacity-80' 
@@ -1309,8 +1435,8 @@ const GenerateReport = () => {
                     <>
                       {enablePartner ? (
                         <>
-                          <Heart className="w-5 h-5" />
-                          Анализ на съвместимост
+                          <Users className="w-5 h-5" />
+                          Анализ с друг човек
                         </>
                       ) : (
                         <>
@@ -1321,6 +1447,14 @@ const GenerateReport = () => {
                     </>
                   )}
                 </button>
+
+                {formBlocked && !loading && (
+                  <p className="text-xs text-center text-amber-200">
+                    {sameProfile
+                      ? 'Изберете друг профил за втория човек.'
+                      : 'Поправете или изберете часа на раждане (виж бележката под него), за да продължите.'}
+                  </p>
+                )}
 
                 {loading && (
                   <div className="space-y-3">
@@ -1386,8 +1520,8 @@ const GenerateReport = () => {
                   <>
                     <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 border-2 border-pink-800/30">
                       <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <Heart className="w-5 h-5 text-pink-400" />
-                        Карта на партньора
+                        <Users className="w-5 h-5 text-pink-400" />
+                        Карта на {partnerData.partner_name.trim() || 'втория човек'}
                       </h2>
                       <AstroChart data={result.partner_chart} />
                     </div>

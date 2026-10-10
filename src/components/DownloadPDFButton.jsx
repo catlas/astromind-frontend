@@ -294,7 +294,17 @@ const DownloadPDFButton = ({
         };
         
         // Group planets in two columns (left: 20-100mm, right: 105-185mm)
-        const planets = Object.entries(natalChart.planets).filter(([_, data]) => data && data.formatted_pos);
+        // Без час на раждане: Луната (и тяло, сменило знак през деня) е с възможни знаци, а домове и Асцендент няма
+        const timeKnown = natalChart.time_known !== false;
+        const signRanges = natalChart.sign_ranges || {};
+        const planets = Object.entries(natalChart.planets).map(([name, data]) => {
+          const range = signRanges[name];
+          if (!timeKnown && range && (name === 'Moon' || (range.signs || []).length > 1)) {
+            const signs = range.signs.map((sign) => SIGN_NAMES[sign] || sign);
+            return [name, { formatted_pos: signs.length > 1 ? `${signs.join(' или ')} (според часа)` : `${signs[0]} (градусът не е известен)` }];
+          }
+          return [name, data];
+        }).filter(([_, data]) => data && data.formatted_pos);
         const midPoint = Math.ceil(planets.length / 2);
         
         planets.slice(0, midPoint).forEach(([planetName, planetData]) => {
@@ -306,7 +316,7 @@ const DownloadPDFButton = ({
         });
         
         // Add ASC if available
-        if (natalChart.angles && natalChart.angles.Ascendant !== null && natalChart.angles.Ascendant !== undefined) {
+        if (timeKnown && natalChart.angles && natalChart.angles.Ascendant !== null && natalChart.angles.Ascendant !== undefined) {
           const ascFormatted = natalChart.angles.Ascendant_formatted || `${Math.floor(natalChart.angles.Ascendant)}°`;
           const ascTranslated = translateSign(ascFormatted);
           // fontSize increased by 50%: 8 -> 12
@@ -324,7 +334,9 @@ const DownloadPDFButton = ({
           yPos += 9;
         });
         
-        // Section 2: Houses
+        // Section 2: Houses (само при известен час)
+        let houseYPos = yPos;
+        if (timeKnown) {
         yPos += 12;
         // fontSize increased by 50%: 11 -> 17
         addCyrillicText("2. ДОМОВЕ", 20, yPos, { align: 'left', fontSize: 17, width: 170, color: '#000000' });
@@ -352,7 +364,7 @@ const DownloadPDFButton = ({
         };
         
         // Display houses with planets (left column)
-        let houseYPos = yPos;
+        houseYPos = yPos;
         [1, 2, 3, 4, 5, 6].forEach(houseNum => {
           const planets = planetsByHouse[houseNum] || [];
           if (planets.length > 0) {
@@ -374,12 +386,13 @@ const DownloadPDFButton = ({
             houseYPos += 9;
           }
         });
+        }
         
         // Section 3: Aspects (if available) - 3 columns layout
         if (natalAspects && natalAspects.length > 0) {
           yPos = Math.max(yPos, houseYPos) + 4; // Reduced spacing: was +12, now +4 (2 rows up = 16mm less, so 12-16 = -4, but we keep min 4mm)
           // fontSize increased by 50%: 11 -> 17
-          addCyrillicText("3. АСПЕКТИ", 20, yPos, { align: 'left', fontSize: 17, width: 170, color: '#000000' });
+          addCyrillicText(timeKnown ? "3. АСПЕКТИ" : "2. АСПЕКТИ", 20, yPos, { align: 'left', fontSize: 17, width: 170, color: '#000000' });
           yPos += 12;
           
           // Calculate column widths (3 columns with small gaps)

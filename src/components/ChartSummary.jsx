@@ -49,11 +49,23 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
   if (!natalChart || !natalChart.planets || !natalChart.houses) {
     return null;
   }
+  // Без час на раждане няма домове, Асцендент и MC; Луната (и тяло, сменило знак през деня) е с възможни знаци
+  const timeKnown = natalChart.time_known !== false;
+  const signRanges = natalChart.sign_ranges || {};
+  const dependsOnTime = (planetName) => !timeKnown && signRanges[planetName]
+    && (planetName === 'Moon' || (signRanges[planetName].signs || []).length > 1);
+  const timeDependentText = (planetName) => {
+    const info = signRanges[planetName];
+    const signs = (info.signs || []).map((sign) => SIGN_NAMES[sign] || sign);
+    return signs.length > 1
+      ? `${signs.join(' или ')} (според часа)`
+      : `${signs[0]} (знакът е сигурен, градусът не е)`;
+  };
 
   // Групиране на планети по домове (използваме house полето, ако е налично)
   const planetsByHouse = {};
 
-  Object.entries(natalChart.planets).forEach(([planetName, planetData]) => {
+  if (timeKnown) Object.entries(natalChart.planets).forEach(([planetName, planetData]) => {
     if (!planetData || planetData.longitude === null || planetData.longitude === undefined) {
       return;
     }
@@ -70,7 +82,7 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
   });
 
   // Добавяне на ASC и MC ако има
-  if (natalChart.angles) {
+  if (timeKnown && natalChart.angles) {
     if (natalChart.angles.Ascendant !== null && natalChart.angles.Ascendant !== undefined) {
       // ASC е в 1-ви дом по дефиниция
       if (!planetsByHouse[1]) {
@@ -92,6 +104,12 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
         Обобщена информация за картата
       </h3>
 
+      {!timeKnown && (
+        <p className="text-sm text-amber-200 bg-amber-900/20 border border-amber-700/30 rounded p-3">
+          Часът на раждане е неизвестен: няма Асцендент, MC и домове. Планетите са за 12:00 местно време на датата на раждане, а Луната и всяко тяло, което сменя знак през деня, са показани с възможните знаци.
+        </p>
+      )}
+
       {/* 1. Планетарни позиции */}
       <div className="space-y-2">
         <h4 className="text-base font-semibold text-slate-200 flex items-center gap-2">
@@ -100,6 +118,14 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
           {Object.entries(natalChart.planets).map(([planetName, planetData]) => {
+            if (dependsOnTime(planetName)) {
+              return (
+                <div key={planetName} className="flex items-center justify-between py-1 px-3 bg-slate-700/30 rounded">
+                  <span className="font-medium text-slate-200">{PLANET_NAMES[planetName] || planetName}:</span>
+                  <span className="text-slate-300 text-right">{timeDependentText(planetName)}</span>
+                </div>
+              );
+            }
             if (!planetData || !planetData.formatted_pos) return null;
             
             // Извличаме знака от formatted_pos и го превеждаме на български
@@ -122,7 +148,7 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
             );
           })}
           {/* Добавяне на ASC */}
-          {natalChart.angles && natalChart.angles.Ascendant !== null && natalChart.angles.Ascendant !== undefined && (
+          {timeKnown && natalChart.angles && natalChart.angles.Ascendant !== null && natalChart.angles.Ascendant !== undefined && (
             <div className="flex items-center justify-between py-1 px-3 bg-slate-700/30 rounded">
               <span className="font-medium text-slate-200">Асцендент:</span>
               <span className="text-slate-300">
@@ -142,8 +168,8 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
         </div>
       </div>
 
-      {/* 2. Домове */}
-      <div className="space-y-2">
+      {/* 2. Домове (само при известен час) */}
+      {timeKnown && <div className="space-y-2">
         <h4 className="text-base font-semibold text-slate-200 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           2. ДОМОВЕ
@@ -169,14 +195,14 @@ export default function ChartSummary({ natalChart, natalAspects = null }) {
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* 3. Аспекти */}
       {natalAspects && natalAspects.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-base font-semibold text-slate-200 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
-            3. АСПЕКТИ
+            {timeKnown ? '3' : '2'}. АСПЕКТИ
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
             {natalAspects.map((aspect, idx) => {

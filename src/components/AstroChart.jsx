@@ -275,6 +275,9 @@ export default function AstroChart({ data }) {
         {/* Планети */}
         {renderPlanets()}
       </svg>
+      {data.time_known === false && (
+        <p className="sr-only">Часът на раждане е неизвестен: колелото е без домове, Асцендент и MC и без Луна.</p>
+      )}
     </div>
   );
 }

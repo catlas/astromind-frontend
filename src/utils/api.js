@@ -11,10 +11,27 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Съобщението за грешка от бекенда (detail), ако е текст
+// Съобщението за грешка от бекенда (detail). При 422 detail е списък от проверки на полетата: превеждаме познатите
+// и никога не връщаме списък (екраните го ползват като текст).
 export const apiErrorMessage = (err, fallback = 'Възникна грешка. Опитайте отново.') => {
   const detail = err?.response?.data?.detail;
-  return typeof detail === 'string' ? detail : fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.map((item) => {
+      if (item?.type === 'string_too_long') return `Текстът е твърде дълъг (най-много ${item?.ctx?.max_length ?? '—'} знака).`;
+      const msg = typeof item?.msg === 'string' ? item.msg.replace(/^Value error,\s*/i, '') : '';
+      return /[а-яА-Я]/.test(msg) ? msg : '';
+    }).filter(Boolean);
+    if (messages.length) return [...new Set(messages)].join(' ');
+  }
+  return fallback;
+};
+
+// Състояние на местния час на раждане: зона, отместване, несъществуващ или повтарящ се час (Фаза 12)
+export const fetchTimeCheck = async ({ date, time, lat, lon, fold }) => {
+  const params = { date, time, lat, lon };
+  if (fold === 0 || fold === 1) params.fold = fold;
+  return (await api.get('/time-check', { params, timeout: 10000 })).data;
 };
 
 export const storeSession = (token, user) => {
