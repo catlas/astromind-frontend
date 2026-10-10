@@ -130,6 +130,14 @@ const Privacy = () => (
         защита на личните данни (www.cpdp.bg).
       </p>
     </Section>
+    <Section title="6. Източници на данни за местата">
+      <p>
+        Координатите и часовите зони на населените места идват от базата GeoNames (
+        <a href="https://www.geonames.org" target="_blank" rel="noopener noreferrer" className="underline text-purple-300">geonames.org</a>
+        ), лиценз Creative Commons Attribution 4.0. Базата е вградена в сървъра ни: за търсене на място към GeoNames не се
+        изпраща нищо. Места извън нея (под 15 000 жители) се показват като непроверени.
+      </p>
+    </Section>
   </>
 );
 

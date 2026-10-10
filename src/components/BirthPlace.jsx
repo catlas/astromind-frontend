@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Map as MapIcon, MapPin, Sparkles } from 'lucide-react';
+import { Loader2, Map as MapIcon, MapPin } from 'lucide-react';
 import { bulgarianCities } from '../utils/bulgarianCities';
 import { apiErrorMessage, geocodePlace } from '../utils/api';
 import { OTHER, findListCity } from '../utils/birthPlace';
 
 // Общият модул за място на раждане. Ползва се в „Профили“ и в „Генерирай хороскоп“
 // (за човека и за партньора). Състоянието е при родителя (виж emptyPlace в utils/birthPlace):
-//   <BirthPlaceSelect>  падащо меню с градове + „Друг“ (град, държава и търсене с AI)
+//   <BirthPlaceSelect>  падащо меню с градове + „Друг“ (град, държава и търсене: AI нормализира името, а координатите
+//                       идват от GeoNames; място извън базата е „непроверено“)
 //   <BirthCoordinates>  ширина и дължина, винаги видими и редактируеми
 // Двата компонента са отделни, за да могат да стоят на различни места във формата.
 
@@ -43,7 +44,8 @@ const VARIANTS = {
 export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label = 'Място на раждане' }) => {
   const style = VARIANTS[variant] || VARIANTS.profile;
   const [searching, setSearching] = useState(false);
-  const [status, setStatus] = useState(null); // { ok, text } за резултата от търсенето с AI
+  const [status, setStatus] = useState(null); // { tone: 'ok' | 'warn' | 'error', text } за резултата от търсенето
+  const [choices, setChoices] = useState([]);    // няколко места със същото име: потребителят избира
 
   // Най-новата стойност, за да не презапишем промени, направени, докато търсим
   const latest = useRef(value);
@@ -62,6 +64,7 @@ export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label =
   const handleSelect = (e) => {
     const next = e.target.value;
     setStatus(null);
+    setChoices([]);
     if (next === OTHER) {
       // Координатите на предишния град не бива да останат за ново място
       onChange({ mode: 'other', city: '', country: '', lat: '', lon: '' });
@@ -78,6 +81,7 @@ export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label =
 
   const handleText = (field) => (e) => {
     setStatus(null);
+    setChoices([]);
     onChange({ ...value, [field]: e.target.value });
   };
 
@@ -93,25 +97,47 @@ export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label =
     const country = value.country.trim();
     setSearching(true);
     setStatus(null);
+    setChoices([]);
     try {
       const found = await geocodePlace(city, country);
       if (!alive.current) return;
       const current = latest.current;
       // Полетата са променени по време на търсенето: резултатът не важи за новия текст
       if (current.mode !== 'other' || current.city.trim() !== city || current.country.trim() !== country) return;
+      if (found.status === 'ambiguous') {
+        setChoices(found.candidates || []);
+        setStatus({ tone: 'warn', text: found.message || 'Има няколко места с това име. Изберете вашето.' });
+        return;
+      }
       onChange({ ...current, lat: String(found.lat), lon: String(found.lon) });
       const name = [found.city, found.country].filter(Boolean).join(', ');
-      setStatus({
-        ok: true,
-        text: `Намерено с AI: ${name} (${found.lat}, ${found.lon}). Проверете координатите и ги коригирайте при нужда.`,
-      });
+      setStatus(found.verified
+        ? {
+          tone: 'ok',
+          text: `Проверено по GeoNames: ${name}${found.timezone ? `, зона ${found.timezone}` : ''} (${found.lat}, ${found.lon}). Данни за местата: GeoNames, CC BY 4.0.`,
+        }
+        : {
+          tone: 'warn',
+          text: `Непроверено: ${name} (${found.lat}, ${found.lon}). Мястото го няма в проверената база (под 15 000 жители), а координатите са от AI. Проверете ги и ги коригирайте.`,
+        });
     } catch (err) {
       if (alive.current) {
-        setStatus({ ok: false, text: apiErrorMessage(err, 'Не успяхме да намерим координатите. Въведете ги ръчно.') });
+        setStatus({ tone: 'error', text: apiErrorMessage(err, 'Не успяхме да намерим координатите. Въведете ги ръчно.') });
       }
     } finally {
       if (alive.current) setSearching(false);
     }
+  };
+
+  // Избор между няколко места със същото име
+  const choose = (place) => {
+    const current = latest.current;
+    onChange({ ...current, lat: String(place.lat), lon: String(place.lon) });
+    setChoices([]);
+    setStatus({
+      tone: 'ok',
+      text: `Проверено по GeoNames: ${place.city} (${place.country_code}), зона ${place.timezone} (${place.lat}, ${place.lon}). Данни за местата: GeoNames, CC BY 4.0.`,
+    });
   };
 
   return (
@@ -162,12 +188,28 @@ export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label =
               disabled={searching}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${style.button}`}
             >
-              {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {searching ? 'Търсене...' : 'Намери координатите с AI'}
+              {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+              {searching ? 'Търсене...' : 'Намери координатите'}
             </button>
           )}
 
-          {status && <p className={`text-xs ${status.ok ? 'text-green-400' : 'text-red-400'}`}>{status.text}</p>}
+          {status && (
+            <p className={`text-xs ${status.tone === 'ok' ? 'text-green-400' : status.tone === 'warn' ? 'text-amber-300' : 'text-red-400'}`}>
+              {status.text}
+            </p>
+          )}
+          {choices.length > 0 && (
+            <ul className="space-y-1" aria-label="Места със същото име">
+              {choices.map((place) => (
+                <li key={place.id}>
+                  <button type="button" onClick={() => choose(place)}
+                    className="w-full text-left text-xs px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200">
+                    {place.city} · {place.country_code} · {Number(place.population).toLocaleString('bg-BG')} жители · {place.lat}, {place.lon}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <p className={style.hint}>Или въведете ширината и дължината ръчно.</p>
         </div>
       )}
