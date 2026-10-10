@@ -151,6 +151,12 @@ const Balance = () => {
           </div>
         )}
 
+        {config && paymentsOn && config.payments_mode === 'test' && (
+          <div className="max-w-3xl mx-auto mb-8 px-4 py-3 rounded-xl text-sm bg-blue-500/10 border border-blue-500/30 text-blue-100" role="status">
+            <b>Тестов режим на плащанията.</b> Не се взема истинска сума. На страницата за плащане ползвайте тестовата карта 4242 4242 4242 4242 с произволна бъдеща дата и произволен CVC.
+          </div>
+        )}
+
         {config && !enforced && (
           <div className="max-w-3xl mx-auto mb-8 px-4 py-3 rounded-xl text-sm bg-yellow-500/10 border border-yellow-500/20 text-yellow-200">
             Засега анализите са безплатни — от баланса не се взема нищо. Цените по-долу ще важат, когато стартира таксуването.
