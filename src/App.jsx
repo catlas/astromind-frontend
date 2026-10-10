@@ -1,7 +1,7 @@
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
-import BuyCoins from './pages/BuyCoins';
+import Balance from './pages/Balance';
 import GenerateReport from './pages/GenerateReport';
 import Profiles from './pages/Profiles';
 import History from './pages/History';
@@ -11,13 +11,20 @@ import Admin from './pages/Admin';
 import Welcome from './pages/Welcome';
 import Legal from './pages/Legal';
 
+// Старият адрес /buy-coins (линкове, запазени страници, връщане от плащане) води към новата страница, с параметрите
+const BuyCoinsRedirect = () => {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: '/balance', search }} replace />;
+};
+
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/buy-coins" element={<BuyCoins />} />
+        <Route path="/balance" element={<Balance />} />
+        <Route path="/buy-coins" element={<BuyCoinsRedirect />} />
         <Route path="/generate-report" element={<GenerateReport />} />
         <Route path="/profiles" element={<Profiles />} />
         <Route path="/history" element={<History />} />

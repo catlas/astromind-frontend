@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { verifySession } from '../utils/auth';
 import { api, apiErrorMessage } from '../utils/api';
 import { bulgarianCities } from '../utils/bulgarianCities';
+import { formatEur, giftOf } from '../utils/money';
 
 const inputClass = 'w-full bg-[#0B0616] border border-white/10 p-3 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#5211d4]';
 
@@ -129,7 +130,12 @@ const Welcome = () => {
             </p>
             <ul className="space-y-2 text-slate-300">
               <li className="flex gap-2"><span className="material-symbols-outlined text-[#a78bfa]">lock</span> Данните ви се пазят в профила ви и можете да ги изтриете по всяко време.</li>
-              <li className="flex gap-2"><span className="material-symbols-outlined text-[#a78bfa]">token</span> Получавате бонус монети за първия си подробен AI анализ.</li>
+              <li className="flex gap-2">
+                <span className="material-symbols-outlined text-[#a78bfa]">card_giftcard</span>
+                {giftOf(user) > 0
+                  ? `В баланса ви има ${formatEur(giftOf(user))} подарък за основните анализи.`
+                  : 'Основните анализи се плащат от баланса ви.'}
+              </li>
             </ul>
             <div className="flex flex-wrap gap-3">
               <button onClick={() => setStep(2)} className="px-6 py-3 rounded-xl bg-[#5211d4] hover:bg-[#5211d4]/90 font-bold">Да започнем</button>

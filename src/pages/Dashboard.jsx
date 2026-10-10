@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 import { BigThreeCard } from './Welcome';
+import { accessLabel, balanceOf, formatEur, giftOf, paidOf } from '../utils/money';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -108,11 +109,11 @@ const Dashboard = () => {
             <span className="text-sm font-medium">Настройки</span>
           </button>
           <button 
-            onClick={() => navigate('/buy-coins')}
+            onClick={() => navigate('/balance')}
             className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
           >
             <span className="material-symbols-outlined">credit_card</span>
-            <span className="text-sm font-medium">Монети</span>
+            <span className="text-sm font-medium">Баланс</span>
           </button>
         </div>
         
@@ -138,9 +139,9 @@ const Dashboard = () => {
                   <span className="material-symbols-outlined text-[#5211d4]" style={{ fontSize: '18px' }}>manage_accounts</span>
                   Редактирай профила
                 </button>
-                <button onClick={() => { navigate('/buy-coins'); setUserMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
+                <button onClick={() => { navigate('/balance'); setUserMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
                   <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '18px' }}>token</span>
-                  {user.coins || 0} монети в баланса
+                  Баланс: {formatEur(balanceOf(user))}
                 </button>
                 <div className="h-px bg-slate-800 my-1" />
                 <button onClick={() => setLogoutConfirm(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all text-left">
@@ -165,9 +166,9 @@ const Dashboard = () => {
               <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
               <div className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '11px' }}>token</span>
-                <span className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</span>
+                <span className="text-[11px] text-yellow-400 font-medium">{formatEur(balanceOf(user))}</span>
                 <span className="text-[#a69db9] text-[10px] mx-1">·</span>
-                <span className="text-[11px] text-[#a69db9]">Безплатен</span>
+                <span className="text-[11px] text-[#a69db9]">{accessLabel(user)}</span>
               </div>
             </div>
             <span className={`material-symbols-outlined text-slate-500 group-hover:text-slate-300 transition-all ${userMenuOpen ? 'rotate-180' : ''}`} style={{ fontSize: '18px' }}>expand_less</span>
@@ -239,11 +240,11 @@ const Dashboard = () => {
                 <span className="text-sm font-medium">Настройки</span>
               </button>
               <button 
-                onClick={() => { navigate('/buy-coins'); setIsSidebarOpen(false); }}
+                onClick={() => { navigate('/balance'); setIsSidebarOpen(false); }}
                 className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
               >
                 <span className="material-symbols-outlined">credit_card</span>
-                <span className="text-sm font-medium">Монети</span>
+                <span className="text-sm font-medium">Баланс</span>
               </button>
             </div>
             
@@ -269,9 +270,9 @@ const Dashboard = () => {
                       <span className="material-symbols-outlined text-[#5211d4]" style={{ fontSize: '18px' }}>manage_accounts</span>
                       Редактирай профила
                     </button>
-                    <button onClick={() => { navigate('/buy-coins'); setUserMenuOpen(false); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
+                    <button onClick={() => { navigate('/balance'); setUserMenuOpen(false); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
                       <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '18px' }}>token</span>
-                      {user.coins || 0} монети в баланса
+                      Баланс: {formatEur(balanceOf(user))}
                     </button>
                     <div className="h-px bg-slate-800 my-1" />
                     <button onClick={() => setLogoutConfirm(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all text-left">
@@ -296,9 +297,9 @@ const Dashboard = () => {
                   <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
                   <div className="flex items-center gap-1">
                     <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '11px' }}>token</span>
-                    <span className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</span>
+                    <span className="text-[11px] text-yellow-400 font-medium">{formatEur(balanceOf(user))}</span>
                     <span className="text-[#a69db9] text-[10px] mx-1">·</span>
-                    <span className="text-[11px] text-[#a69db9]">Безплатен</span>
+                    <span className="text-[11px] text-[#a69db9]">{accessLabel(user)}</span>
                   </div>
                 </div>
                 <span className={`material-symbols-outlined text-slate-500 group-hover:text-slate-300 transition-all ${userMenuOpen ? 'rotate-180' : ''}`} style={{ fontSize: '18px' }}>expand_less</span>
@@ -392,9 +393,12 @@ const Dashboard = () => {
                     <span className="material-symbols-outlined text-[#5211d4]">token</span>
                     <p className="text-[#a69db9] text-sm font-medium uppercase tracking-wider">Баланс</p>
                   </div>
-                  <p className="text-4xl font-bold text-white tracking-tight mb-2">{user.coins ?? 0} AstroМонети</p>
+                  <p className="text-4xl font-bold text-white tracking-tight mb-2">{formatEur(balanceOf(user))}</p>
                   <p className="text-[#a69db9] text-base">
-                    Монетите се използват за подробни анализи и синастрия.
+                    Внесени средства: {formatEur(paidOf(user))} · Подарък: {formatEur(giftOf(user))}
+                  </p>
+                  <p className="text-[#a69db9] text-sm mt-1">
+                    Подаръкът важи за основните анализи. Анализът за двама и прогнозите за период се плащат от внесени средства.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -406,10 +410,10 @@ const Dashboard = () => {
                     Генерирай хороскоп
                   </button>
                   <button 
-                    onClick={() => navigate('/buy-coins')}
+                    onClick={() => navigate('/balance')}
                     className="flex cursor-pointer items-center justify-center rounded-lg h-10 px-6 bg-[#5211d4] hover:bg-[#5211d4]/90 transition-colors text-white text-sm font-bold shadow-lg shadow-[#5211d4]/20"
                   >
-                    Зареди портфейл
+                    Зареди баланс
                   </button>
                 </div>
               </div>

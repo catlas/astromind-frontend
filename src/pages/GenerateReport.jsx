@@ -9,6 +9,7 @@ import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
 import { emptyPlace, normalizePlace, placeFromParts, placeFromProfile, placeLabel } from '../utils/birthPlace';
 import { clearSessionAndRedirect, getApiBaseUrl, verifySession } from '../utils/auth';
 import { api, fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
+import { accessLabel, availableFor, balanceOf, formatEur, periodMonths, quoteFor, withBalance } from '../utils/money';
 import DOMPurify from 'dompurify';
 
 // Менюто на мобилната странична лента (на компютър бутоните са изписани директно по-долу)
@@ -18,7 +19,7 @@ const NAV_ITEMS = [
   { path: '/profiles', icon: 'groups', label: 'Профили' },
   { path: '/history', icon: 'history', label: 'История' },
   { path: '/settings', icon: 'settings', label: 'Настройки', separated: true },
-  { path: '/buy-coins', icon: 'credit_card', label: 'Монети' },
+  { path: '/balance', icon: 'credit_card', label: 'Баланс' },
 ];
 
 // Горна граница на периода на прогнозата (календарни месеци). Сървърът я праща в /billing/config;
@@ -90,12 +91,13 @@ const GenerateReport = () => {
   const [searchParams] = useSearchParams();
   const [billingConfig, setBillingConfig] = useState(null);
   const [crisisHtml, setCrisisHtml] = useState('');
+  const [needsBalance, setNeedsBalance] = useState(false); // сървърът отказа анализа заради недостиг на средства
 
-  const updateBalance = (balance) => {
-    if (balance === null || balance === undefined) return;
+  const updateBalance = (source) => {
+    if (!source) return;
     setUser((prev) => {
       if (!prev) return prev;
-      const next = { ...prev, coins: balance };
+      const next = withBalance(prev, source);
       localStorage.setItem('user', JSON.stringify(next));
       return next;
     });
@@ -339,7 +341,9 @@ const GenerateReport = () => {
         }
         if (!response.ok) {
           return response.json().catch(() => ({})).then(body => {
-            throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP error! status: ${response.status}`);
+            const failure = new Error(typeof body.detail === 'string' ? body.detail : `HTTP error! status: ${response.status}`);
+            failure.status = response.status;
+            throw failure;
           });
         }
         
@@ -446,7 +450,7 @@ const GenerateReport = () => {
               break;
 
             case 'complete':
-              updateBalance(data.balance);
+              updateBalance(data);
               setLoadingMessage('');
               clearTimeout(timeoutId);
               resolve();
@@ -455,6 +459,7 @@ const GenerateReport = () => {
             case 'error':
               hasError = true;
               clearTimeout(timeoutId);
+              if (data.code === 402) setNeedsBalance(true);
               setError(data.message || 'Грешка при генериране на прогноза');
               // Неуспешната прогноза не се записва и не се таксува: не оставяме недовършени месеци на екрана
               setMonthlyResults([]);
@@ -502,6 +507,7 @@ const GenerateReport = () => {
     setLoading(true);
     setLoadingMessage('');
     setError(null);
+    setNeedsBalance(false);
     setResult(null);
     setCrisisHtml('');
 
@@ -612,7 +618,7 @@ const GenerateReport = () => {
           setCrisisHtml(response.data.interpretation);
         } else {
           setResult(response.data);
-          updateBalance(response.data.balance);
+          updateBalance(response.data);
         }
       }
       
@@ -625,6 +631,7 @@ const GenerateReport = () => {
         clearSessionAndRedirect(navigate);
         return;
       }
+      if ((err?.response?.status || err?.status) === 402) setNeedsBalance(true);
 
       // Извличане на съобщението за грешка, премахвайки префикси като "Неочаквана грешка: 400:"
       let errorMessage = err.response?.data?.detail || err.message || 'Възникна грешка при изчисляване на картата';
@@ -689,11 +696,11 @@ const GenerateReport = () => {
             <span className="text-sm font-medium">Настройки</span>
           </button>
           <button 
-            onClick={() => navigate('/buy-coins')}
+            onClick={() => navigate('/balance')}
             className="flex items-center gap-3 px-3 py-3 rounded-lg text-[#a69db9] hover:bg-white/5 transition-all"
           >
             <span className="material-symbols-outlined">credit_card</span>
-            <span className="text-sm font-medium">Монети</span>
+            <span className="text-sm font-medium">Баланс</span>
           </button>
         </div>
         
@@ -719,9 +726,9 @@ const GenerateReport = () => {
                   <span className="material-symbols-outlined text-[#5211d4]" style={{ fontSize: '18px' }}>manage_accounts</span>
                   Редактирай профила
                 </button>
-                <button onClick={() => { navigate('/buy-coins'); setUserMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
+                <button onClick={() => { navigate('/balance'); setUserMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
                   <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '18px' }}>token</span>
-                  {user.coins || 0} монети в баланса
+                  Баланс: {formatEur(balanceOf(user))}
                 </button>
                 <div className="h-px bg-slate-800 my-1" />
                 <button onClick={() => setLogoutConfirm(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all text-left">
@@ -746,9 +753,9 @@ const GenerateReport = () => {
               <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
               <div className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '11px' }}>token</span>
-                <span className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</span>
+                <span className="text-[11px] text-yellow-400 font-medium">{formatEur(balanceOf(user))}</span>
                 <span className="text-[#a69db9] text-[10px] mx-1">·</span>
-                <span className="text-[11px] text-[#a69db9]">Безплатен</span>
+                <span className="text-[11px] text-[#a69db9]">{accessLabel(user)}</span>
               </div>
             </div>
             <span className={`material-symbols-outlined text-slate-500 group-hover:text-slate-300 transition-all ${userMenuOpen ? 'rotate-180' : ''}`} style={{ fontSize: '18px' }}>expand_less</span>
@@ -800,7 +807,7 @@ const GenerateReport = () => {
 
             <div className="p-4 border-t border-slate-800">
               <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
-              <p className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</p>
+              <p className="text-[11px] text-yellow-400 font-medium">{formatEur(balanceOf(user))}</p>
             </div>
           </div>
         </>
@@ -1182,26 +1189,25 @@ const GenerateReport = () => {
                   </div>
                 </div>
 
-                {billingConfig?.coins_enforced && (() => {
-                  const c = billingConfig.costs || {};
-                  let cost;
-                  if (isDynamic) {
-                    const start = new Date(transitData.target_date || `${new Date().getFullYear()}-01-01`);
-                    const end = endDate ? new Date(endDate) : start;
-                    const months = Math.max(1, (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1);
-                    cost = months * (c.forecast_month || 0);
-                  } else {
-                    cost = c.analysis || 0;
-                  }
-                  if (enablePartner) cost += c.partner_extra || 0;
-                  const enough = (user?.coins ?? 0) >= cost;
+                {billingConfig?.balance_enforced && (() => {
+                  const months = isDynamic ? periodMonths(forecastStart, endDate || forecastStart) : 1;
+                  const quote = quoteFor(billingConfig.prices, { dynamic: isDynamic, months, hasPartner: enablePartner });
+                  const available = availableFor(user, quote.premium);
+                  const enough = available >= quote.cents;
                   return (
-                    <p className={`text-sm text-center ${enough ? 'text-gray-300' : 'text-red-300'}`}>
-                      Цена: <b>{cost}</b> {isDynamic ? '(прибл.) ' : ''}монети · Баланс: <b>{user?.coins ?? 0}</b>
-                      {!enough && (
-                        <button type="button" onClick={() => navigate('/buy-coins')} className="ml-2 underline text-purple-300">Купи монети</button>
+                    <div className="text-center space-y-1">
+                      <p className={`text-sm ${enough ? 'text-gray-300' : 'text-red-300'}`}>
+                        Цена: <b>{formatEur(quote.cents)}</b>{isDynamic ? ' (прибл.)' : ''} · {quote.premium ? 'Внесени средства' : 'Баланс'}: <b>{formatEur(available)}</b>
+                        {!enough && (
+                          <button type="button" onClick={() => navigate('/balance')} className="ml-2 underline text-purple-300">Зареди баланс</button>
+                        )}
+                      </p>
+                      {quote.premium && (
+                        <p className="text-xs text-gray-400">
+                          {enablePartner && !isDynamic ? 'Анализът за двама' : 'Прогнозата за период'} е премиум услуга: плаща се само от внесени средства, не от подаръка.
+                        </p>
                       )}
-                    </p>
+                    </div>
                   );
                 })()}
 
@@ -1265,9 +1271,9 @@ const GenerateReport = () => {
             {error && (
               <div className="bg-red-900/50 border border-red-500/50 rounded-lg p-4">
                 <p className="text-red-200">{error}</p>
-                {String(error).includes('монети') && (
-                  <button onClick={() => navigate('/buy-coins')} className="mt-3 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold">
-                    Купи монети
+                {needsBalance && (
+                  <button onClick={() => navigate('/balance')} className="mt-3 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold">
+                    Зареди баланс
                   </button>
                 )}
               </div>

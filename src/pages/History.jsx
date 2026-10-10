@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
 import { api, deleteReport, fetchReport, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
+import { accessLabel, balanceOf, formatEur } from '../utils/money';
 
 export default function History() {
   const navigate = useNavigate();
@@ -146,9 +147,9 @@ export default function History() {
             <span className="material-symbols-outlined">settings</span>
             <span className="text-sm font-medium">Настройки</span>
           </button>
-          <button onClick={() => navigate('/buy-coins')} className={sidebarButtonClass(false)}>
+          <button onClick={() => navigate('/balance')} className={sidebarButtonClass(false)}>
             <span className="material-symbols-outlined">credit_card</span>
-            <span className="text-sm font-medium">Монети</span>
+            <span className="text-sm font-medium">Баланс</span>
           </button>
         </div>
         <div className="p-4 border-t border-slate-800 relative">
@@ -173,9 +174,9 @@ export default function History() {
                   <span className="material-symbols-outlined text-[#5211d4]" style={{ fontSize: '18px' }}>manage_accounts</span>
                   Редактирай профила
                 </button>
-                <button onClick={() => { navigate('/buy-coins'); setUserMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
+                <button onClick={() => { navigate('/balance'); setUserMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
                   <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '18px' }}>token</span>
-                  {user.coins || 0} монети в баланса
+                  Баланс: {formatEur(balanceOf(user))}
                 </button>
                 <div className="h-px bg-slate-800 my-1" />
                 <button onClick={() => setLogoutConfirm(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all text-left">
@@ -200,9 +201,9 @@ export default function History() {
               <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
               <div className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '11px' }}>token</span>
-                <span className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</span>
+                <span className="text-[11px] text-yellow-400 font-medium">{formatEur(balanceOf(user))}</span>
                 <span className="text-[#a69db9] text-[10px] mx-1">·</span>
-                <span className="text-[11px] text-[#a69db9]">Безплатен</span>
+                <span className="text-[11px] text-[#a69db9]">{accessLabel(user)}</span>
               </div>
             </div>
             <span className={`material-symbols-outlined text-slate-500 group-hover:text-slate-300 transition-all ${userMenuOpen ? 'rotate-180' : ''}`} style={{ fontSize: '18px' }}>expand_less</span>
@@ -251,9 +252,9 @@ export default function History() {
                 <span className="material-symbols-outlined">settings</span>
                 <span className="text-sm font-medium">Настройки</span>
               </button>
-              <button onClick={() => { navigate('/buy-coins'); setIsSidebarOpen(false); }} className={sidebarButtonClass(false)}>
+              <button onClick={() => { navigate('/balance'); setIsSidebarOpen(false); }} className={sidebarButtonClass(false)}>
                 <span className="material-symbols-outlined">credit_card</span>
-                <span className="text-sm font-medium">Монети</span>
+                <span className="text-sm font-medium">Баланс</span>
               </button>
             </div>
             <div className="p-4 border-t border-slate-800 relative">
@@ -278,9 +279,9 @@ export default function History() {
                       <span className="material-symbols-outlined text-[#5211d4]" style={{ fontSize: '18px' }}>manage_accounts</span>
                       Редактирай профила
                     </button>
-                    <button onClick={() => { navigate('/buy-coins'); setUserMenuOpen(false); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
+                    <button onClick={() => { navigate('/balance'); setUserMenuOpen(false); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left">
                       <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '18px' }}>token</span>
-                      {user.coins || 0} монети в баланса
+                      Баланс: {formatEur(balanceOf(user))}
                     </button>
                     <div className="h-px bg-slate-800 my-1" />
                     <button onClick={() => setLogoutConfirm(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-all text-left">
@@ -305,9 +306,9 @@ export default function History() {
                   <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
                   <div className="flex items-center gap-1">
                     <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '11px' }}>token</span>
-                    <span className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</span>
+                    <span className="text-[11px] text-yellow-400 font-medium">{formatEur(balanceOf(user))}</span>
                     <span className="text-[#a69db9] text-[10px] mx-1">·</span>
-                    <span className="text-[11px] text-[#a69db9]">Безплатен</span>
+                    <span className="text-[11px] text-[#a69db9]">{accessLabel(user)}</span>
                   </div>
                 </div>
                 <span className={`material-symbols-outlined text-slate-500 group-hover:text-slate-300 transition-all ${userMenuOpen ? 'rotate-180' : ''}`} style={{ fontSize: '18px' }}>expand_less</span>
@@ -346,9 +347,9 @@ export default function History() {
             <div className="bg-[#201428] rounded-xl p-4 border border-[#302240]">
               <div className="flex items-center gap-2 text-[#d4c8ed] mb-2">
                 <span className="material-symbols-outlined">token</span>
-                <span className="text-xs">Изразходвани монети</span>
+                <span className="text-xs">Изразходвано</span>
               </div>
-              <p className="text-2xl font-bold text-white">{filteredHistory.reduce((sum, h) => sum + h.coins, 0)}</p>
+              <p className="text-2xl font-bold text-white">{formatEur(filteredHistory.reduce((sum, h) => sum + (h.cost_cents || 0), 0))}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 mb-6 flex-wrap">
@@ -451,7 +452,7 @@ export default function History() {
                   <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Тип отчет</th>
                   <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Профил</th>
                   <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Дата</th>
-                  <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Монети</th>
+                  <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Цена</th>
                   <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium">Статус</th>
                   <th className="text-left px-4 py-3 text-xs text-[#d4c8ed] font-medium w-24">Действия</th>
                 </tr>
@@ -480,7 +481,7 @@ export default function History() {
                       </td>
                       <td className="px-4 py-3 text-sm text-white">{item.profile}</td>
                       <td className="px-4 py-3 text-sm text-[#d4c8ed]">{item.date}</td>
-                      <td className="px-4 py-3 text-sm text-white">{item.coins} {item.coins === 1 ? 'монета' : 'монети'}</td>
+                      <td className="px-4 py-3 text-sm text-white">{item.cost_cents > 0 ? formatEur(item.cost_cents) : 'Безплатно'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${

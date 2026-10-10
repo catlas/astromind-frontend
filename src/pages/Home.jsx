@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/auth';
+import { FALLBACK_LIMITS, FALLBACK_PRICES, FALLBACK_SIGNUP_GIFT, FALLBACK_TOPUPS, formatEur } from '../utils/money';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const Home = () => {
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotMsg, setForgotMsg] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [pricing, setPricing] = useState(null); // цени и пакети от сървъра; до зареждането (студен старт) важат стойностите по подразбиране
 
   // С HashRouter линкове като #features биха сменили маршрута; вместо това скролваме до секцията
   useEffect(() => {
@@ -30,6 +32,14 @@ const Home = () => {
     };
     document.addEventListener('click', onClick);
     return () => document.removeEventListener('click', onClick);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    axios.get(`${getApiBaseUrl()}/billing/config`, { timeout: 20000 })
+      .then((r) => { if (alive) setPricing(r.data); })
+      .catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   const handleForgot = async (e) => {
@@ -356,14 +366,14 @@ const Home = () => {
               Отключете пълния потенциал на AstroMind
             </h3>
             <p className="text-slate-400 text-base font-normal leading-normal max-w-[700px]">
-              Разгледайте нашите специализирани астрологични доклади. Стартирайте безплатно и надградете с AstroМонети за дълбоки, персонализирани прозрения.
+              Разгледайте нашите специализирани астрологични доклади. Започнете с подарък при регистрация и плащайте само за анализите, които ползвате. Премиум услугите се отключват след първото зареждане на баланса.
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {/* Натална Карта (Lite) */}
             <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Free</div>
+              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-2">
                 <span className="material-symbols-outlined text-2xl">person</span>
               </div>
@@ -375,7 +385,7 @@ const Home = () => {
             
             {/* Дневен Аспект */}
             <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Free</div>
+              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
               <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 mb-2">
                 <span className="material-symbols-outlined text-2xl">sunny</span>
               </div>
@@ -387,9 +397,7 @@ const Home = () => {
             
             {/* Конкретен Въпрос */}
             <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20 uppercase tracking-wide flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Premium
-              </div>
+              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
               <div className="w-12 h-12 rounded-xl bg-[#5211d4]/10 flex items-center justify-center text-[#5211d4] mb-2">
                 <span className="material-symbols-outlined text-2xl">chat_bubble</span>
               </div>
@@ -402,7 +410,7 @@ const Home = () => {
             {/* Месечен Анализ */}
             <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
               <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20 uppercase tracking-wide flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Premium
+                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Премиум
               </div>
               <div className="w-12 h-12 rounded-xl bg-[#5211d4]/10 flex items-center justify-center text-[#5211d4] mb-2">
                 <span className="material-symbols-outlined text-2xl">calendar_month</span>
@@ -416,7 +424,7 @@ const Home = () => {
             {/* Синастрия */}
             <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
               <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20 uppercase tracking-wide flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Premium
+                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Премиум
               </div>
               <div className="w-12 h-12 rounded-xl bg-pink-500/10 flex items-center justify-center text-pink-400 mb-2">
                 <span className="material-symbols-outlined text-2xl">favorite</span>
@@ -430,7 +438,7 @@ const Home = () => {
             {/* Годишен Доклад */}
             <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
               <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20 uppercase tracking-wide flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Premium
+                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Премиум
               </div>
               <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400 mb-2">
                 <span className="material-symbols-outlined text-2xl">rocket_launch</span>
@@ -443,9 +451,7 @@ const Home = () => {
             
             {/* Кариера и Пари */}
             <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20 uppercase tracking-wide flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Premium
-              </div>
+              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
               <div className="w-12 h-12 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-400 mb-2">
                 <span className="material-symbols-outlined text-2xl">work</span>
               </div>
@@ -457,9 +463,7 @@ const Home = () => {
             
             {/* Кармичен Анализ */}
             <div className="group relative flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#13111C] p-6 hover:border-[#5211d4]/50 hover:shadow-[0_0_20px_rgba(82,17,212,0.15)] transition-all duration-300">
-              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-[#5211d4]/20 text-[#5211d4] border border-[#5211d4]/20 uppercase tracking-wide flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px]">monetization_on</span> Premium
-              </div>
+              <div className="absolute top-4 right-4 px-2 py-1 rounded-md text-[10px] font-bold bg-white/10 text-slate-300 uppercase tracking-wide">Основен</div>
               <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 mb-2">
                 <span className="material-symbols-outlined text-2xl">psychology</span>
               </div>
@@ -477,79 +481,128 @@ const Home = () => {
         <div className="flex flex-col max-w-[1000px] flex-1">
           <div className="text-center mb-12">
             <h2 className="text-white text-3xl md:text-4xl font-bold mb-4">
-              Започнете безплатно. Потопете се дълбоко с AstroМонети.
+              Започнете с подарък. Плащайте само за това, което ползвате.
             </h2>
-            <p className="text-slate-400">Изберете пътя, който съвпада с вашето пътуване.</p>
+            <p className="text-slate-400">Без абонамент: предплатен баланс в евро, от който се взема само при успешен анализ.</p>
+            {pricing && !pricing.balance_enforced && (
+              <p className="text-yellow-200/90 text-sm mt-4">
+                Засега всички анализи са безплатни. Цените по-долу ще важат от старта на таксуването.
+              </p>
+            )}
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-            {/* Free Tier */}
-            <div className="flex flex-col p-8 rounded-2xl border border-white/5 bg-[#13111C] h-full">
-              <div className="mb-4">
-                <h3 className="text-white text-2xl font-bold">Звездоброец</h3>
-                <p className="text-slate-400 text-sm mt-1">Основни ежедневни насоки</p>
+          {(() => {
+            const prices = { ...FALLBACK_PRICES, ...(pricing?.prices || {}) };
+            const eur = formatEur;
+            const gift = pricing ? Number(pricing.signup_gift_cents) || 0 : FALLBACK_SIGNUP_GIFT;
+            const limits = pricing?.limits || FALLBACK_LIMITS;
+            const topups = pricing?.topups || FALLBACK_TOPUPS;
+            const packs = topups
+              .map((t) => (t.credit_cents > t.amount_cents ? `${formatEur(t.amount_cents)} → ${formatEur(t.credit_cents)}` : formatEur(t.amount_cents)))
+              .join(' · ');
+            const goToBalance = () => {
+              if (localStorage.getItem('token')) navigate('/balance');
+              else { setShowAuth(true); setIsLogin(false); }
+            };
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                {/* Основни анализи */}
+                <div className="flex flex-col p-8 rounded-2xl border border-white/5 bg-[#13111C] h-full">
+                  <div className="mb-4">
+                    <h3 className="text-white text-2xl font-bold">Основни анализи</h3>
+                    <p className="text-slate-400 text-sm mt-1">За един човек</p>
+                  </div>
+                  <div className="text-3xl font-bold text-white mb-6">
+                    {eur(prices.basic_analysis)}
+                    <span className="text-sm font-normal text-slate-400"> / анализ</span>
+                    {gift > 0 && (
+                      <span className="text-sm font-normal text-slate-400 block mt-1">
+                        {formatEur(gift)} подарък при регистрация, без карта
+                      </span>
+                    )}
+                  </div>
+                  <ul className="flex flex-col gap-4 mb-8 flex-1">
+                    <li className="flex items-center gap-3 text-slate-300 text-sm">
+                      <span className="material-symbols-outlined text-slate-500 text-lg">check</span>
+                      Натална карта и анализ за избрана дата
+                    </li>
+                    <li className="flex items-center gap-3 text-slate-300 text-sm">
+                      <span className="material-symbols-outlined text-slate-500 text-lg">check</span>
+                      Общ анализ, здраве, кариера, пари, любов, карма
+                    </li>
+                    <li className="flex items-center gap-3 text-slate-300 text-sm">
+                      <span className="material-symbols-outlined text-slate-500 text-lg">check</span>
+                      Подаръкът се харчи първи, после внесените средства
+                    </li>
+                    <li className="flex items-center gap-3 text-slate-300 text-sm">
+                      <span className="material-symbols-outlined text-slate-500 text-lg">check</span>
+                      Неуспешен анализ не се таксува
+                    </li>
+                  </ul>
+                  <button
+                    onClick={() => { setShowAuth(true); setIsLogin(false); }}
+                    className="w-full py-3 rounded-lg border border-[#2e2839] bg-transparent text-white font-bold hover:bg-white/5 transition-all"
+                  >
+                    Започнете безплатно
+                  </button>
+                </div>
+
+                {/* Премиум услуги */}
+                <div className="relative flex flex-col p-8 rounded-2xl border border-[#5211d4] bg-[#13111C] h-full shadow-[0_0_30px_rgba(82,17,212,0.15)]">
+                  <div className="absolute -top-3 right-8 bg-[#5211d4] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                    Премиум
+                  </div>
+                  <div className="mb-4">
+                    <h3 className="text-white text-2xl font-bold">Двойки и прогнози</h3>
+                    <p className="text-slate-400 text-sm mt-1">Отключват се след първото зареждане на баланса</p>
+                  </div>
+                  <div className="text-3xl font-bold text-white mb-6">
+                    {eur(prices.pair_analysis)}
+                    <span className="text-sm font-normal text-slate-400"> / анализ за двама</span>
+                    <span className="text-sm font-normal text-slate-400 block mt-1">
+                      Прогноза за период: {eur(prices.forecast_month)} на месец
+                    </span>
+                  </div>
+                  <ul className="flex flex-col gap-4 mb-8 flex-1">
+                    <li className="flex items-center gap-3 text-white text-sm font-medium">
+                      <span className="material-symbols-outlined text-[#5211d4] text-lg">check</span>
+                      Съвместимост и синастрия между двама души
+                    </li>
+                    <li className="flex items-center gap-3 text-white text-sm font-medium">
+                      <span className="material-symbols-outlined text-[#5211d4] text-lg">check</span>
+                      <span>
+                        Прогноза по месеци с общ преглед на периода
+                        {limits.forecast_max_months_single && limits.forecast_max_months_pair
+                          ? ` (до ${limits.forecast_max_months_single} месеца за един човек, до ${limits.forecast_max_months_pair} за двама; за двама +${eur(prices.forecast_partner_extra)} към цената)`
+                          : ''}
+                      </span>
+                    </li>
+                    <li className="flex items-center gap-3 text-white text-sm font-medium">
+                      <span className="material-symbols-outlined text-[#5211d4] text-lg">check</span>
+                      Плащат се само от внесени средства, не от подаръка
+                    </li>
+                    {packs && (
+                      <li className="flex items-center gap-3 text-white text-sm font-medium">
+                        <span className="material-symbols-outlined text-[#5211d4] text-lg">check</span>
+                        Зареждане: {packs}
+                      </li>
+                    )}
+                    {pricing && (
+                      <li className="flex items-center gap-3 text-white text-sm font-medium">
+                        <span className="material-symbols-outlined text-[#5211d4] text-lg">check</span>
+                        {pricing.payments_enabled ? 'Плащане с карта през Stripe' : 'Зареждането с карта се активира скоро'}
+                      </li>
+                    )}
+                  </ul>
+                  <button
+                    onClick={goToBalance}
+                    className="w-full py-3 rounded-lg bg-[#5211d4] text-white font-bold hover:bg-[#5211d4]/90 transition-all shadow-lg"
+                  >
+                    Зареди баланс
+                  </button>
+                </div>
               </div>
-              <div className="text-3xl font-bold text-white mb-6">Безплатно</div>
-              <ul className="flex flex-col gap-4 mb-8 flex-1">
-                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                  <span className="material-symbols-outlined text-slate-500 text-lg">check</span>
-                  Основен преглед на натална карта
-                </li>
-                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                  <span className="material-symbols-outlined text-slate-500 text-lg">check</span>
-                  Дневен хороскоп
-                </li>
-                <li className="flex items-center gap-3 text-slate-300 text-sm">
-                  <span className="material-symbols-outlined text-slate-500 text-lg">check</span>
-                  Ограничени чат интеракции
-                </li>
-              </ul>
-              <button className="w-full py-3 rounded-lg border border-[#2e2839] bg-transparent text-white font-bold hover:bg-white/5 transition-all">
-                Започнете
-              </button>
-            </div>
-            
-            {/* Paid Tier */}
-            <div className="relative flex flex-col p-8 rounded-2xl border border-[#5211d4] bg-[#13111C] h-full shadow-[0_0_30px_rgba(82,17,212,0.15)]">
-              <div className="absolute -top-3 right-8 bg-[#5211d4] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                Най-популярно
-              </div>
-              <div className="mb-4">
-                <h3 className="text-white text-2xl font-bold">Космически Пътешественик</h3>
-                <p className="text-slate-400 text-sm mt-1">Дълбок анализ & терапевтични сесии</p>
-              </div>
-              <div className="text-3xl font-bold text-white mb-6">
-                AstroМонети
-                <span className="text-sm font-normal text-slate-400 block mt-1">
-                  Гъвкаво заплащане според употребата
-                </span>
-              </div>
-              <ul className="flex flex-col gap-4 mb-8 flex-1">
-                <li className="flex items-center gap-3 text-white text-sm font-medium">
-                  <span className="material-symbols-outlined text-[#5211d4] text-lg">check</span>
-                  Неограничен терапевтичен чат
-                </li>
-                <li className="flex items-center gap-3 text-white text-sm font-medium">
-                  <span className="material-symbols-outlined text-[#5211d4] text-lg">check</span>
-                  Доклади за синастрия във връзките
-                </li>
-                <li className="flex items-center gap-3 text-white text-sm font-medium">
-                  <span className="material-symbols-outlined text-[#5211d4] text-lg">check</span>
-                  Бъдещи транзитни прогнози (1 Година)
-                </li>
-                <li className="flex items-center gap-3 text-white text-sm font-medium">
-                  <span className="material-symbols-outlined text-[#5211d4] text-lg">check</span>
-                  Приоритетна AI обработка
-                </li>
-              </ul>
-              <button 
-                onClick={() => navigate('/buy-coins')}
-                className="w-full py-3 rounded-lg bg-[#5211d4] text-white font-bold hover:bg-[#5211d4]/90 transition-all shadow-lg"
-              >
-                Вземете AstroМонети
-              </button>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       </section>
 
@@ -583,7 +636,7 @@ const Home = () => {
                 ))}
               </div>
               <p className="text-slate-300 text-sm italic mb-6">
-                "Моделът с AstroМонети е страхотен, защото плащам само за дълбоките анализи, от които имам нужда. Дневните аспекти са точни и ми помагат да планирам работната седмица."
+                "Харесва ми, че плащам само за анализите, от които имам нужда. Дневните аспекти са точни и ми помагат да планирам работната седмица."
               </p>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-slate-700"></div>
@@ -642,7 +695,7 @@ const Home = () => {
               <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">Продукт</h3>
               <a href="#features" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Функции</a>
               <a href="#pricing" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Цени</a>
-              <a href="#/buy-coins" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">AstroМонети</a>
+              <a href="#/balance" className="text-slate-500 hover:text-[#5211d4] text-sm transition-colors">Баланс</a>
             </div>
             <div className="flex flex-col gap-4">
               <h3 className="font-bold text-sm text-slate-300 uppercase tracking-wider">Компания</h3>

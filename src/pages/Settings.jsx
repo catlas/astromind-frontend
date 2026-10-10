@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { verifySession, clearSessionAndRedirect, getApiBaseUrl } from '../utils/auth';
 import axios from 'axios';
 import { api, apiErrorMessage, fetchProfiles } from '../utils/api';
+import { FALLBACK_PRICES, accessLabel, balanceOf, formatEur, giftOf, paidOf } from '../utils/money';
 
 const TABS = [
   { id: 'account', label: 'Акаунт', icon: 'manage_accounts' },
@@ -10,7 +11,7 @@ const TABS = [
   { id: 'notifications', label: 'Известия', icon: 'notifications' },
   { id: 'memory', label: 'AI памет', icon: 'psychology' },
   { id: 'privacy', label: 'Поверителност', icon: 'shield' },
-  { id: 'subscription', label: 'Абонамент', icon: 'workspace_premium' },
+  { id: 'subscription', label: 'Баланс', icon: 'workspace_premium' },
 ];
 
 const sidebarButtonClass = (isActive) =>
@@ -241,6 +242,14 @@ export default function Settings() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
 
+  // Цени и режим на таксуване (за раздела „Баланс“)
+  const [billingConfig, setBillingConfig] = useState(null);
+
+  useEffect(() => {
+    if (activeTab !== 'subscription' || billingConfig) return;
+    api.get('/billing/config').then((r) => setBillingConfig(r.data)).catch(() => {});
+  }, [activeTab, billingConfig]);
+
   useEffect(() => {
     let isMounted = true;
     const loadUser = async () => {
@@ -419,9 +428,9 @@ export default function Settings() {
           <span className="material-symbols-outlined">settings</span>
           <span className="text-sm font-medium">Настройки</span>
         </button>
-        <button onClick={() => { navigate('/buy-coins'); if (mobile) setIsSidebarOpen(false); }} className={sidebarButtonClass(false)}>
+        <button onClick={() => { navigate('/balance'); if (mobile) setIsSidebarOpen(false); }} className={sidebarButtonClass(false)}>
           <span className="material-symbols-outlined">credit_card</span>
-          <span className="text-sm font-medium">Монети</span>
+          <span className="text-sm font-medium">Баланс</span>
         </button>
       </div>
 
@@ -468,7 +477,7 @@ export default function Settings() {
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-all text-left"
               >
                 <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '18px' }}>token</span>
-                {user.coins || 0} монети в баланса
+                Баланс: {formatEur(balanceOf(user))}
               </button>
               <div className="h-px bg-slate-800 my-1" />
               <button
@@ -503,9 +512,9 @@ export default function Settings() {
             <p className="text-sm font-semibold text-white truncate">{user.full_name || 'Потребител'}</p>
             <div className="flex items-center gap-1">
               <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '11px' }}>token</span>
-              <span className="text-[11px] text-yellow-400 font-medium">{user.coins || 0} монети</span>
+              <span className="text-[11px] text-yellow-400 font-medium">{formatEur(balanceOf(user))}</span>
               <span className="text-[#a69db9] text-[10px] mx-1">·</span>
-              <span className="text-[11px] text-[#a69db9]">Безплатен</span>
+              <span className="text-[11px] text-[#a69db9]">{accessLabel(user)}</span>
             </div>
           </div>
 
@@ -530,7 +539,7 @@ export default function Settings() {
                   <p className="text-[#a69db9] text-sm">{user.email}</p>
                   <div className="flex items-center gap-1 mt-1">
                     <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '14px' }}>token</span>
-                    <span className="text-yellow-400 text-xs font-medium">{user.coins || 0} монети</span>
+                    <span className="text-yellow-400 text-xs font-medium">{formatEur(balanceOf(user))}</span>
                   </div>
                 </div>
               </div>
@@ -734,7 +743,7 @@ export default function Settings() {
               </SettingsRow>
               <SettingsRow
                 label="Промоционални оферти"
-                description="Специални оферти за монети и нови функции"
+                description="Специални оферти за баланса и нови функции"
               >
                 <Toggle checked={notifPromo} onChange={(v) => handleNotifChange('astro_notif_promo', v)} />
               </SettingsRow>
@@ -836,68 +845,88 @@ export default function Settings() {
           </div>
         );
 
-      case 'subscription':
+      case 'subscription': {
+        const prices = { ...FALLBACK_PRICES, ...(billingConfig?.prices || {}) };
+        const hasPaid = paidOf(user) > 0;
+        const free = billingConfig && !billingConfig.balance_enforced;
         return (
           <div className="flex flex-col gap-6">
-            <SectionCard title="Текущ план" description="Преглед на твоя абонамент и баланс" icon="workspace_premium">
+            <SectionCard title="Баланс и достъп" description="Наличен баланс, цени и какво се отключва" icon="workspace_premium">
               <div className="flex items-center justify-between p-4 rounded-xl bg-[#161022] border border-slate-700 mb-5">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-slate-700/50">
-                    <span className="material-symbols-outlined text-slate-400" style={{ fontSize: '24px' }}>star</span>
+                    <span className="material-symbols-outlined text-slate-400" style={{ fontSize: '24px' }}>{hasPaid ? 'workspace_premium' : 'star'}</span>
                   </div>
                   <div>
-                    <p className="text-white font-semibold">Безплатен план</p>
-                    <p className="text-xs text-[#a69db9]">10 монети при регистрация</p>
+                    <p className="text-white font-semibold">{hasPaid ? 'Премиум достъп' : 'Основен достъп'}</p>
+                    <p className="text-xs text-[#a69db9]">
+                      {free
+                        ? 'Засега всички анализи са безплатни.'
+                        : hasPaid
+                          ? 'Анализът за двама и прогнозите за период се плащат от внесените средства.'
+                          : 'Анализът за двама и прогнозите за период се отключват след първото зареждане.'}
+                    </p>
                   </div>
                 </div>
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-700/50 text-slate-400 border border-slate-600">
-                  Активен
+                  {accessLabel(user)}
                 </span>
               </div>
 
               <div className="flex items-center gap-3 mb-5">
-                <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '28px' }}>token</span>
+                <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '28px' }}>account_balance_wallet</span>
                 <div>
-                  <p className="text-2xl font-bold text-white">{user.coins || 0} <span className="text-sm font-normal text-[#a69db9]">AstroМонети</span></p>
-                  <p className="text-xs text-[#a69db9]">Достатъчно за ~{Math.floor((user.coins || 0) / 2)} детайлни анализа</p>
+                  <p className="text-2xl font-bold text-white">{formatEur(balanceOf(user))}</p>
+                  <p className="text-xs text-[#a69db9]">
+                    Внесени средства {formatEur(paidOf(user))} · Подарък {formatEur(giftOf(user))} (само за основните анализи)
+                  </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-                {[
-                  { label: 'Дневен хороскоп', cost: '0', icon: 'wb_sunny' },
-                  { label: 'Натална карта', cost: '1', icon: 'account_circle' },
-                  { label: 'Пълен анализ', cost: '2-4', icon: 'auto_awesome' },
-                ].map(item => (
-                  <div key={item.label} className="bg-[#161022] border border-slate-800 rounded-xl p-3 flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[#a69db9]" style={{ fontSize: '18px' }}>{item.icon}</span>
-                    <div>
-                      <p className="text-xs text-[#a69db9]">{item.label}</p>
-                      <p className="text-sm font-bold text-white">{item.cost} <span className="font-normal text-[#a69db9]">монети</span></p>
+              {billingConfig && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+                  {[
+                    { label: 'Основен анализ', cost: formatEur(prices.basic_analysis), icon: 'account_circle' },
+                    { label: 'Анализ за двама', cost: formatEur(prices.pair_analysis), icon: 'favorite' },
+                    { label: 'Прогноза за период', cost: `${formatEur(prices.forecast_month)} / месец`, icon: 'date_range' },
+                  ].map(item => (
+                    <div key={item.label} className="bg-[#161022] border border-slate-800 rounded-xl p-3 flex items-center gap-3">
+                      <span className="material-symbols-outlined text-[#a69db9]" style={{ fontSize: '18px' }}>{item.icon}</span>
+                      <div>
+                        <p className="text-xs text-[#a69db9]">{item.label}</p>
+                        <p className="text-sm font-bold text-white">{item.cost}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               <button
-                onClick={() => navigate('/buy-coins')}
+                onClick={() => navigate('/balance')}
                 className="w-full flex items-center justify-center gap-2 py-3 bg-[#5211d4] hover:bg-[#5211d4]/90 text-white font-bold rounded-xl transition-all shadow-lg shadow-[#5211d4]/20"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>credit_card</span>
-                Купи монети
+                Зареди баланс
               </button>
             </SectionCard>
 
-            <SectionCard title="История на плащанията" description="Твоите последни транзакции" icon="receipt_long">
+            <SectionCard title="История на плащанията" description="Движения по баланса и разписки" icon="receipt_long">
               <div className="flex flex-col items-center gap-3 py-6 text-center">
                 <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center">
                   <span className="material-symbols-outlined text-slate-600" style={{ fontSize: '24px' }}>receipt_long</span>
                 </div>
-                <p className="text-slate-500 text-sm">Все още няма транзакции</p>
+                <p className="text-slate-500 text-sm">Зареждания, разходи за анализи и разписки се виждат на страница „Баланс“.</p>
+                <button
+                  onClick={() => navigate('/balance')}
+                  className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-white"
+                >
+                  Отвори баланса
+                </button>
               </div>
             </SectionCard>
           </div>
         );
+      }
 
       default:
         return null;
