@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
 import { Loader2, Sparkles, Calendar, Clock, MessageSquare, User, TrendingUp, Heart, Activity, Infinity } from 'lucide-react';
 import AstroChart from '../components/AstroChart';
 import DownloadPDFButton from '../components/DownloadPDFButton';
 import ChartSummary from '../components/ChartSummary';
 import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
 import { emptyPlace, normalizePlace, placeFromParts, placeFromProfile, placeLabel } from '../utils/birthPlace';
-import { clearSessionAndRedirect, getApiBaseUrl, verifySession } from '../utils/auth';
+import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
 import { accessLabel, availableFor, balanceOf, formatEur, periodMonths, quoteFor, withBalance } from '../utils/money';
+import {
+  STAGE_MESSAGES, STAGE_STEPS, cancelJob, createJob, fetchJob, fetchJobLimits, forgetJob, isActive, newKey,
+  recallJob, rememberJob, waitText,
+} from '../utils/jobs';
 import DOMPurify from 'dompurify';
 
 // Менюто на мобилната странична лента (на компютър бутоните са изписани директно по-долу)
@@ -25,9 +28,19 @@ const NAV_ITEMS = [
 // Горна граница на периода на прогнозата (календарни месеци). Сървърът я праща в /billing/config;
 // тези стойности се ползват, докато конфигурацията не е заредена.
 const FALLBACK_LIMITS = { forecast_max_months_single: 3, forecast_max_months_pair: 2 };
-// Проверката на готовия текст (Фаза 10) може да добави една втора AI заявка към всеки месец
-const STREAM_IDLE_TIMEOUT_MS = 480000; // 8 минути без нито едно събитие от сървъра
-const REQUEST_TIMEOUT_MS = 480000;     // обикновена заявка (натален анализ или анализ за дата): 8 минути
+// Прогресът на задача се чете през GET /jobs/{id}: често в началото, по-рядко при дълга прогноза
+const pollDelay = (startedAt, hidden) => {
+  const elapsed = Date.now() - startedAt;
+  if (hidden) return 8000;
+  if (elapsed < 20000) return 1500;
+  return elapsed < 180000 ? 2500 : 5000;
+};
+
+// Общият преглед на периода е първи, после месеците (на екрана, в DOCX и в запазения отчет)
+const formatInterpretation = (items) => items.map((m, idx) => {
+  const separator = idx > 0 ? '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' : '';
+  return `${separator}## ${m.isOverview ? '🔭' : '📅'} ${m.month}\n\n${m.text}`;
+}).join('\n\n');
 
 // Последният позволен ден за период, започващ на startIso (YYYY-MM-DD): краят на maxMonths-я календарен месец.
 const maxEndDate = (startIso, maxMonths) => {
@@ -36,6 +49,30 @@ const maxEndDate = (startIso, maxMonths) => {
   const last = new Date(y, m - 1 + maxMonths, 0);
   const pad = (n) => String(n).padStart(2, '0');
   return `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`;
+};
+
+// Реалните етапи на задачата (без измислен процент): изчисляване → анализ → проверка → готово
+const STAGE_RANK = { queued: 0, calculating: 1, analyzing: 2, checking: 3, finishing: 4, done: 5 };
+
+const JobStages = ({ stage, waitingLong }) => {
+  // Току-що създадена задача още е "в опашка", но изчислението започва веднага: първият етап се показва като текущ
+  const current = stage === 'queued' ? STAGE_RANK.calculating : (STAGE_RANK[stage] ?? 0);
+  return (
+    <div className="space-y-1">
+      <ol className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+        {STAGE_STEPS.map((step) => {
+          const rank = STAGE_RANK[step.id];
+          const state = rank < current ? 'done' : rank === current ? 'now' : 'todo';
+          return (
+            <li key={step.id} className={state === 'now' ? 'text-white font-bold' : state === 'done' ? 'text-green-300' : 'text-gray-500'}>
+              {state === 'done' ? '✓ ' : state === 'now' ? '● ' : '○ '}{step.label}
+            </li>
+          );
+        })}
+      </ol>
+      {stage === 'queued' && waitingLong && <p className="text-xs text-center text-gray-400">Чака ред: други анализи се изпълняват.</p>}
+    </div>
+  );
 };
 
 const formatBgDate = (iso) => (iso ? iso.split('-').reverse().join('.') : '');
@@ -92,6 +129,12 @@ const GenerateReport = () => {
   const [billingConfig, setBillingConfig] = useState(null);
   const [crisisHtml, setCrisisHtml] = useState('');
   const [needsBalance, setNeedsBalance] = useState(false); // сървърът отказа анализа заради недостиг на средства
+  const [notice, setNotice] = useState('');               // спокойно съобщение (напр. отказана задача), не грешка
+  const [activeJob, setActiveJob] = useState(null);        // състоянието на задачата, която следим
+  const [jobLimits, setJobLimits] = useState(null);        // колко анализа остават и кога може нов опит
+  const pollRef = useRef({ timer: null, jobId: null, seen: 0, months: [], failures: 0, stopped: true, startedAt: 0, payloadKey: null });
+  const submitKeys = useRef(new Map());                    // ключ за идемпотентност за всяка различна заявка
+  const snapshotRef = useRef(null);                        // резултатът преди новия анализ: връща се при неуспех или отказ
 
   const updateBalance = (source) => {
     if (!source) return;
@@ -143,6 +186,43 @@ const GenerateReport = () => {
       isMounted = false;
     };
   }, [navigate]);
+
+  // Връщане към задача, започната преди обновяване на страницата или излизане от нея
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let alive = true;
+    refreshLimits();
+    const remembered = recallJob(user.id);
+    if (remembered) {
+      (async () => {
+        try {
+          const job = await fetchJob(remembered, 0);
+          if (!alive) return;
+          if (isActive(job)) {
+            attachToJob(remembered, { resumed: true });
+          } else {
+            // Приключила е, докато страницата е била затворена: показваме резултата и я забравяме
+            pollRef.current = { ...pollRef.current, jobId: remembered, seen: 0, months: [], stopped: false, payloadKey: null };
+            (job.events || []).forEach(applyEvent);
+            finishJob(job);
+          }
+        } catch {
+          forgetJob(user.id);
+        }
+      })();
+    }
+    return () => {
+      alive = false;
+      stopPolling();      // анализът продължава на сървъра; при връщане се намира по запомнения номер
+    };
+  }, [user?.id]);
+
+  // Когато ограничението изтече, опресняваме лимита, за да се отключи бутонът
+  useEffect(() => {
+    if (!jobLimits || jobLimits.can_start || !jobLimits.retry_after_seconds) return undefined;
+    const timer = setTimeout(refreshLimits, jobLimits.retry_after_seconds * 1000 + 500);
+    return () => clearTimeout(timer);
+  }, [jobLimits]);
 
   const selectedProfile = savedProfiles.find((p) => String(p.id) === profileChoice) || null;
   const partnerProfile = savedProfiles.find((p) => String(p.id) === partnerChoice) || null;
@@ -310,196 +390,195 @@ const GenerateReport = () => {
     }));
   };
 
-  const handleDynamicForecastStreaming = async (API_BASE_URL, requestData) => {
-    const token = localStorage.getItem('token');
-    return new Promise((resolve, reject) => {
-      // AbortController: прекъсва само при пълно мълчание на сървъра. Времето се подновява с всяко получено събитие,
-      // защото един месец с проверка и поправка на фактите може да трае няколко минути.
-      const controller = new AbortController();
-      let timeoutId = null;
-      const armTimeout = () => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
-      };
-      armTimeout();
-      
-      // Use fetch with ReadableStream for POST requests with SSE
-      fetch(`${API_BASE_URL}/interpret-stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(requestData),
-        signal: controller.signal,
-      })
-      .then(response => {
-        if (response.status === 401 || response.status === 403) {
-          clearSessionAndRedirect(navigate);
-          throw new Error('Сесията е изтекла. Моля влезте отново.');
-        }
-        if (!response.ok) {
-          return response.json().catch(() => ({})).then(body => {
-            const failure = new Error(typeof body.detail === 'string' ? body.detail : `HTTP error! status: ${response.status}`);
-            failure.status = response.status;
-            throw failure;
-          });
-        }
-        
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        
-        let monthlyResultsTemp = [];
-        let hasError = false;
+  // ---------------------------------------------------------------------------
+  // Задачи за анализ (Фаза 11): генерацията върви на сървъра, а екранът я следи
+  // ---------------------------------------------------------------------------
+  const refreshLimits = () => {
+    fetchJobLimits().then(setJobLimits).catch(() => {});
+  };
 
-        const processText = (text) => {
-          buffer += text;
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const jsonStr = line.slice(6); // Remove 'data: ' prefix
-              if (jsonStr.trim()) {
-                try {
-                  const data = JSON.parse(jsonStr);
-                  handleSSEMessage(data, monthlyResultsTemp, resolve, reject);
-                } catch (err) {
-                  console.error('Error parsing SSE data:', err, jsonStr);
-                }
-              }
-            }
-          }
-        };
+  const stopPolling = () => {
+    const state = pollRef.current;
+    state.stopped = true;
+    if (state.timer) clearTimeout(state.timer);
+    state.timer = null;
+  };
 
-        // Общият преглед на периода (когато е готов) е първи, после месеците
-        const formatInterpretation = (items) => items.map((m, idx) => {
-          const separator = idx > 0 ? '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' : '';
-          return `${separator}## ${m.isOverview ? '🔭' : '📅'} ${m.month}\n\n${m.text}`;
-        }).join('\n\n');
+  // Едно събитие от задачата. Същите видове като при стария поток: start, месеци, общ преглед, text, complete.
+  const applyEvent = (event) => {
+    const state = pollRef.current;
+    switch (event.type) {
+      case 'stage':
+        if (STAGE_MESSAGES[event.stage]) setLoadingMessage(STAGE_MESSAGES[event.stage]);
+        break;
+      case 'start':
+        state.months = [];
+        setMonthlyResults([]);
+        setResult({
+          natal_chart: event.natal_chart || null,
+          partner_chart: event.partner_chart || null,
+          transit_chart: event.transit_chart || null,
+          natal_aspects: event.natal_aspects || null,
+          partner_natal_aspects: event.partner_natal_aspects || null,
+          interpretation: '',
+        });
+        if (event.kind === 'forecast') setLoadingMessage(`Започва генериране на прогноза за ${event.total_months} месеца...`);
+        break;
+      case 'month_start':
+        setLoadingMessage(`Генериране на подробен месечен анализ за месец ${event.month}`);
+        break;
+      case 'month_complete':
+        state.months.push({ month: event.month, text: event.text });
+        setMonthlyResults([...state.months]);
+        setResult((prev) => ({ ...prev, interpretation: formatInterpretation(state.months) }));
+        break;
+      case 'overview_start':
+        setLoadingMessage('Съставяне на общия преглед на периода...');
+        break;
+      case 'overview_complete':
+        // Общият преглед идва след месеците, но се показва най-отгоре (и първи в PDF и DOCX)
+        state.months.unshift({ month: event.title || 'Общ преглед на периода', text: event.text, isOverview: true });
+        setMonthlyResults([...state.months]);
+        setResult((prev) => ({ ...prev, interpretation: formatInterpretation(state.months) }));
+        break;
+      case 'text':
+        setResult((prev) => ({ ...prev, interpretation: event.interpretation }));
+        break;
+      case 'complete':
+        updateBalance(event);
+        break;
+      default:
+        break;
+    }
+  };
 
-        const handleSSEMessage = (data, monthlyResultsTemp, resolve, reject) => {
-          switch (data.type) {
-            case 'start':
-              setLoadingMessage(`Започва генериране на прогноза за ${data.total_months} месеца...`);
-              // Set natal chart data with aspects immediately when stream starts
-              setResult(prev => ({
-                ...prev,
-                natal_chart: data.natal_chart || null,
-                partner_chart: data.partner_chart || null,
-                transit_chart: data.transit_chart || null, // Add transit chart from start event
-                natal_aspects: data.natal_aspects || null,
-                partner_natal_aspects: data.partner_natal_aspects || null,
-                interpretation: ''
-              }));
-              break;
-              
-            case 'month_start':
-              setLoadingMessage(`Генериране на подробен месечен анализ за месец ${data.month}`);
-              break;
-              
-              case 'month_complete':
-              // Add monthly result immediately
-              monthlyResultsTemp.push({
-                month: data.month,
-                text: data.text
-              });
-              
-              // Update state with monthly results for PDF generation
-              setMonthlyResults([...monthlyResultsTemp]);
-              
-              // Update result with accumulated months
-              // Format with clean markdown for proper rendering in PDF
-              setResult(prev => ({
-                ...prev,
-                interpretation: formatInterpretation(monthlyResultsTemp),
-                natal_chart: prev?.natal_chart || null,
-                partner_chart: prev?.partner_chart || null,
-                transit_chart: prev?.transit_chart || null // Preserve transit_chart
-              }));
-              break;
+  // Краят на задачата: успех, неуспех или отказ. Неуспешната задача не оставя недовършени месеци на екрана.
+  const finishJob = (job) => {
+    stopPolling();
+    setActiveJob(job);
+    setLoading(false);
+    setLoadingMessage('');
+    if (user?.id) forgetJob(user.id);
+    if (pollRef.current.payloadKey) submitKeys.current.delete(pollRef.current.payloadKey);
+    if (job.balance) updateBalance(job.balance);
+    // Неуспех или отказ: последният резултат остава на екрана; без него не оставяме недовършени месеци
+    const restorePrevious = () => {
+      const previous = snapshotRef.current;
+      setMonthlyResults(previous ? previous.monthlyResults : []);
+      setResult(previous ? previous.result : (prev) => (prev ? { ...prev, interpretation: '' } : prev));
+    };
+    if (job.status === 'failed') {
+      setError(job.error?.message || 'Анализът не успя. Сумата е върната.');
+      restorePrevious();
+    } else if (job.status === 'cancelled') {
+      setNotice('Анализът е отказан. Сумата е върната в баланса.');
+      restorePrevious();
+    }
+    snapshotRef.current = null;
+    refreshLimits();
+  };
 
-            case 'overview_start':
-              setLoadingMessage('Съставяне на общия преглед на периода...');
-              break;
+  const pollJob = async (jobId) => {
+    const state = pollRef.current;
+    if (state.stopped || state.jobId !== jobId) return;
+    const schedule = (delay) => {
+      if (state.stopped || state.jobId !== jobId) return;
+      state.timer = setTimeout(() => pollJob(jobId), delay);
+    };
+    try {
+      const job = await fetchJob(jobId, state.seen);
+      if (state.stopped || state.jobId !== jobId) return;
+      if (state.failures >= 6) setNotice('');       // връзката се върна
+      state.failures = 0;
+      if ((job.event_count || 0) < state.seen) {
+        // Сървърът е върнал задачата в опашката (рестарт): четем събитията отначало
+        state.seen = 0;
+        state.months = [];
+        setMonthlyResults([]);
+        schedule(300);
+        return;
+      }
+      (job.events || []).forEach(applyEvent);
+      state.seen += (job.events || []).length;
+      setActiveJob(job);
+      if (job.balance) updateBalance(job.balance);       // баланса показва и резервираната сума
+      if (isActive(job)) {
+        schedule(pollDelay(state.startedAt, typeof document !== 'undefined' && document.visibilityState === 'hidden'));
+      } else {
+        finishJob(job);
+      }
+    } catch (err) {
+      if (state.stopped || state.jobId !== jobId) return;
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        clearSessionAndRedirect(navigate);
+        return;
+      }
+      if (status === 404) {
+        stopPolling();
+        setLoading(false);
+        setLoadingMessage('');
+        if (user?.id) forgetJob(user.id);
+        setError('Задачата не е намерена. Ако анализът е приключил, ще го намерите в История.');
+        return;
+      }
+      // Мрежата прекъсна: анализът продължава на сървъра, а ние опитваме пак с нарастваща пауза
+      state.failures += 1;
+      if (state.failures === 6) setNotice('Връзката със сървъра е прекъсната. Анализът продължава на сървъра; пробваме отново.');
+      schedule(Math.min(15000, 1500 * 2 ** Math.min(state.failures, 4)));
+    }
+  };
 
-            case 'overview_complete':
-              // Общият преглед идва след месеците, но се показва най-отгоре (и първи в PDF и DOCX)
-              monthlyResultsTemp.unshift({
-                month: data.title || 'Общ преглед на периода',
-                text: data.text,
-                isOverview: true
-              });
-              setMonthlyResults([...monthlyResultsTemp]);
-              setResult(prev => ({
-                ...prev,
-                interpretation: formatInterpretation(monthlyResultsTemp),
-                natal_chart: prev?.natal_chart || null,
-                partner_chart: prev?.partner_chart || null,
-                transit_chart: prev?.transit_chart || null
-              }));
-              break;
-              
-            case 'crisis':
-              setCrisisHtml(data.html || '');
-              setLoadingMessage('');
-              clearTimeout(timeoutId);
-              resolve();
-              break;
+  // Започва да следи задача: нова или намерена след обновяване на страницата
+  const attachToJob = (jobId, { resumed = false, payloadKey = null } = {}) => {
+    stopPolling();
+    pollRef.current = { timer: null, jobId, seen: 0, months: [], failures: 0, stopped: false, startedAt: Date.now(), payloadKey };
+    if (user?.id) rememberJob(user.id, jobId);
+    setLoading(true);
+    if (resumed) setLoadingMessage('Анализът продължава на сървъра…');
+    pollJob(jobId);
+  };
 
-            case 'complete':
-              updateBalance(data);
-              setLoadingMessage('');
-              clearTimeout(timeoutId);
-              resolve();
-              break;
-              
-            case 'error':
-              hasError = true;
-              clearTimeout(timeoutId);
-              if (data.code === 402) setNeedsBalance(true);
-              setError(data.message || 'Грешка при генериране на прогноза');
-              // Неуспешната прогноза не се записва и не се таксува: не оставяме недовършени месеци на екрана
-              setMonthlyResults([]);
-              setResult(prev => (prev ? { ...prev, interpretation: '' } : prev));
-              reject(new Error(data.message));
-              break;
-          }
-        };
+  // Създава задачата. Един и същ ключ за една и съща заявка: двоен клик връща същата задача, без втори анализ.
+  const startJob = async (requestData) => {
+    const payloadKey = JSON.stringify(requestData);
+    let key = submitKeys.current.get(payloadKey);
+    if (!key) {
+      key = newKey();
+      submitKeys.current.set(payloadKey, key);
+    }
+    try {
+      const data = await createJob(requestData, key);
+      if (data.crisis) {
+        submitKeys.current.delete(payloadKey);
+        setCrisisHtml(data.html || '');
+        return null;
+      }
+      attachToJob(data.job.id, { payloadKey });
+      return data.job;
+    } catch (err) {
+      // Отказ на сървъра (400, 402, 429...): следващото изпращане е нова заявка. При прекъсната мрежа ключът се пази.
+      const status = err?.response?.status;
+      if (status && status < 500) submitKeys.current.delete(payloadKey);
+      throw err;
+    }
+  };
 
-        const pump = () => {
-          reader.read()
-            .then(({ done, value }) => {
-              if (done) {
-                if (!hasError) {
-                  resolve();
-                }
-                return;
-              }
-              
-              armTimeout();
-              const text = decoder.decode(value, { stream: true });
-              processText(text);
-              pump();
-            })
-            .catch(err => {
-              console.error('Stream reading error:', err);
-              setError('Грешка при четене на данните');
-              reject(err);
-            });
-        };
-
-        pump();
-      })
-      .catch(error => {
-        clearTimeout(timeoutId);
-        console.error('Fetch error:', error);
-        setError('Грешка при свързване със сървъра');
-        reject(error);
-      });
-    });
+  const handleCancel = async () => {
+    const jobId = pollRef.current.jobId;
+    if (!jobId) return;
+    try {
+      const data = await cancelJob(jobId);
+      finishJob(data.job);
+    } catch (err) {
+      if (err?.response?.status === 409) {
+        // Анализът е приключил точно сега: показваме резултата, а не отказ
+        pollRef.current.stopped = false;
+        pollJob(jobId);
+        return;
+      }
+      setError(err?.response?.data?.detail || 'Отказът не успя. Опитайте отново.');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -508,9 +587,11 @@ const GenerateReport = () => {
     setLoadingMessage('');
     setError(null);
     setNeedsBalance(false);
-    setResult(null);
-    setCrisisHtml('');
+    setNotice('');
+    setCrisisHtml('');        // последният резултат остава на екрана, докато новият анализ не стартира
+    snapshotRef.current = { result, monthlyResults };
 
+    let attached = false;     // докато задачата работи, екранът остава в състояние на изчакване
     try {
       // Валидация
       if (!formData.date || !formData.time || !birthPlace.lat || !birthPlace.lon) {
@@ -594,34 +675,9 @@ const GenerateReport = () => {
         }
       }
 
-      // Динамичен избор на URL:
-      // - В production (hostname != localhost): използва Render.com API
-      // - В development (localhost): използва локален сървър
-      const API_BASE_URL = getApiBaseUrl();
-      const token = localStorage.getItem('token');
+      // Създаваме задача: генерацията върви на сървъра, а екранът я следи (виж attachToJob)
+      attached = Boolean(await startJob(requestData));
 
-      // Изпращане на заявка
-      // Проверка дали е динамична прогноза - използваме streaming
-      if (isDynamic) {
-        // Use Server-Sent Events for streaming
-        await handleDynamicForecastStreaming(API_BASE_URL, requestData);
-      } else {
-        // Standard request
-        const response = await axios.post(`${API_BASE_URL}/interpret`, requestData, {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          timeout: REQUEST_TIMEOUT_MS  // анализът с проверка и евентуална поправка на фактите може да трае няколко минути
-        });
-
-        if (response.data.crisis) {
-          setCrisisHtml(response.data.interpretation);
-        } else {
-          setResult(response.data);
-          updateBalance(response.data);
-        }
-      }
-      
       // Запомняме настройките към профила (или запазваме нов профил) на сървъра
       persistProfile({ lat, lon });
     } catch (err) {
@@ -635,13 +691,16 @@ const GenerateReport = () => {
 
       // Извличане на съобщението за грешка, премахвайки префикси като "Неочаквана грешка: 400:"
       let errorMessage = err.response?.data?.detail || err.message || 'Възникна грешка при изчисляване на картата';
+      if (err.isAxiosError && !err.response) {
+        errorMessage = 'Няма връзка със сървъра. Опитайте отново след малко: повторното изпращане няма да направи втори анализ.';
+      }
       
       // Премахване на префикси като "Неочаквана грешка: 400:" или "400:"
       errorMessage = errorMessage.replace(/^(Неочаквана грешка:\s*)?\d+:\s*/i, '').trim();
       
       setError(errorMessage);
     } finally {
-      setLoading(false);
+      if (!attached) setLoading(false);
     }
   };
 
@@ -1211,9 +1270,19 @@ const GenerateReport = () => {
                   );
                 })()}
 
+                {jobLimits && (
+                  <p className={`text-xs text-center ${jobLimits.can_start ? 'text-gray-400' : 'text-red-300'}`}>
+                    {jobLimits.can_start
+                      ? `Остават ${jobLimits.hour_remaining} от ${jobLimits.hour_limit} анализа този час.`
+                      : jobLimits.active_jobs >= jobLimits.max_active_jobs
+                        ? 'Вече имате анализ в процес. Изчакайте го да приключи.'
+                        : `Достигнахте лимита за анализи. Нов анализ може ${waitText(jobLimits.retry_after_seconds)}.`}
+                  </p>
+                )}
+
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || (jobLimits ? !jobLimits.can_start : false)}
                   className={`w-full font-bold py-3 px-4 rounded-lg shadow-lg transition-all flex justify-center items-center gap-2
                     ${loading 
                       ? 'bg-gray-600 cursor-not-allowed opacity-80' 
@@ -1234,11 +1303,6 @@ const GenerateReport = () => {
                             ? 'Генериране на подробен месечен анализ...' 
                             : 'ГЕНЕРИРАНЕ НА ПОДРОБЕН АНАЛИЗ')}
                         </span>
-                        {loading && (
-                          <span className="text-red-400 font-bold text-2xl animate-pulse">
-                            Моля изчакайте!
-                          </span>
-                        )}
                       </div>
                     </>
                   ) : (
@@ -1257,8 +1321,28 @@ const GenerateReport = () => {
                     </>
                   )}
                 </button>
+
+                {loading && (
+                  <div className="space-y-3">
+                    <JobStages stage={activeJob?.stage || 'queued'} waitingLong={Date.now() - pollRef.current.startedAt > 5000} />
+                    <p className="text-xs text-center text-gray-400">
+                      Анализът продължава на сървъра. Ако напуснете страницата, ще го намерите тук при връщане или в История, когато приключи.
+                    </p>
+                    <div className="flex justify-center">
+                      <button type="button" onClick={handleCancel} className="text-sm underline text-gray-300 hover:text-white">
+                        Откажи анализа
+                      </button>
+                    </div>
+                  </div>
+                )}
               </form>
             </div>
+
+            {notice && (
+              <div className="bg-slate-800/60 border border-slate-600/50 rounded-lg p-4 text-slate-200 text-sm">
+                {notice}
+              </div>
+            )}
 
             {crisisHtml && (
               <div
@@ -1271,6 +1355,9 @@ const GenerateReport = () => {
             {error && (
               <div className="bg-red-900/50 border border-red-500/50 rounded-lg p-4">
                 <p className="text-red-200">{error}</p>
+                {activeJob?.status === 'failed' && billingConfig?.balance_enforced && (
+                  <p className="text-red-200/80 text-sm mt-1">Сумата е върната в баланса.</p>
+                )}
                 {needsBalance && (
                   <button onClick={() => navigate('/balance')} className="mt-3 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold">
                     Зареди баланс

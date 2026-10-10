@@ -8,6 +8,7 @@ const REASON_LABELS = {
   signup_gift: 'Подарък при регистрация',
   signup_bonus: 'Подарък при регистрация',
   legacy_gift_topup: 'Подарък за съществуващите акаунти',
+  job_refund: 'Върната сума',
   opening_balance: 'Начален баланс',
   purchase: 'Зареждане на баланс',
   analysis: 'Анализ',

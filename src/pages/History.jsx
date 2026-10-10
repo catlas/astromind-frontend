@@ -4,6 +4,7 @@ import DOMPurify from 'dompurify';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
 import { api, deleteReport, fetchReport, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 import { accessLabel, balanceOf, formatEur } from '../utils/money';
+import { fetchJobs, isActive, rememberJob } from '../utils/jobs';
 
 export default function History() {
   const navigate = useNavigate();
@@ -20,6 +21,15 @@ export default function History() {
   const [viewLoading, setViewLoading] = useState(false);
   const [viewMode, setViewMode] = useState('table');
   const [timeline, setTimeline] = useState(null);
+  const [jobs, setJobs] = useState([]);   // анализи в процес и неуспешни от последното денонощие (Фаза 11)
+
+  const loadJobs = async () => {
+    try {
+      setJobs(await fetchJobs({ limit: 10 }));
+    } catch {
+      // без задачите историята пак работи
+    }
+  };
 
   const loadReports = async () => {
     try {
@@ -59,11 +69,42 @@ export default function History() {
       if (isMounted && sessionUser) {
         setUser(sessionUser);
         loadReports();
+        loadJobs();
       }
     };
     loadUser();
     return () => { isMounted = false; };
   }, [navigate]);
+
+  // Докато има анализ в процес, го следим: щом приключи, отчетът се появява в списъка
+  const hasActiveJob = jobs.some(isActive);
+  useEffect(() => {
+    if (!user || !hasActiveJob) return undefined;
+    const timer = setInterval(async () => {
+      try {
+        const latest = await fetchJobs({ limit: 10 });
+        setJobs(latest);
+        if (!latest.some(isActive)) loadReports();
+      } catch {
+        // следващият опит е след 5 секунди
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [user, hasActiveJob]);
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const visibleJobs = jobs
+    .filter((j) => isActive(j) || (j.status !== 'succeeded' && Date.now() - new Date(`${j.created_at}Z`).getTime() < DAY_MS))
+    .slice(0, 5);
+  const jobTitle = (j) => {
+    const sm = j.summary || {};
+    const base = REPORT_TYPE_LABELS[sm.report_type] || 'Анализ';
+    return `${base}${sm.is_dynamic ? ' (прогноза за период)' : ''}${sm.partner_name ? ` с ${sm.partner_name}` : ''}${sm.name ? ` — ${sm.name}` : ''}`;
+  };
+  const openGenerator = (j) => {
+    if (isActive(j) && user) rememberJob(user.id, j.id);
+    navigate('/generate-report');
+  };
 
   useEffect(() => {
     if (viewMode !== 'timeline' || !user) return;
@@ -327,6 +368,29 @@ export default function History() {
             </h1>
             <p className="text-[#d4c8ed] text-base">Преглед на всички генерирани анализи и отчети</p>
           </div>
+
+          {visibleJobs.length > 0 && (
+            <div className="mb-6 space-y-2">
+              {visibleJobs.map((j) => (
+                <div key={j.id} className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 text-sm ${isActive(j) ? 'border-[#7c5dfa]/40 bg-[#7c5dfa]/10' : 'border-[#f87171]/30 bg-[#f87171]/10'}`}>
+                  <span className="material-symbols-outlined">{isActive(j) ? 'hourglass_top' : 'error'}</span>
+                  <div className="flex-1 min-w-[200px]">
+                    <p className="text-white font-medium">{jobTitle(j)}</p>
+                    <p className="text-xs text-[#d4c8ed]">
+                      {isActive(j)
+                        ? 'Анализът се изпълнява на сървъра. Ще се появи в списъка, когато е готов.'
+                        : j.status === 'cancelled'
+                          ? 'Отказан. Сумата е върната в баланса.'
+                          : (j.error?.message || 'Не успя. Сумата е върната в баланса.')}
+                    </p>
+                  </div>
+                  <button onClick={() => openGenerator(j)} className="px-3 py-1.5 rounded-lg bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-xs font-bold">
+                    {isActive(j) ? 'Отвори' : 'Нов опит'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-6">
