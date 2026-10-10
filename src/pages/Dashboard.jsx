@@ -5,8 +5,8 @@ import { api, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } f
 import { BigThreeCard } from './Welcome';
 import { accessLabel, balanceOf, formatEur, giftOf, paidOf } from '../utils/money';
 
-// Нощно небе от CSS: без външна снимка (повече поверителност, по-малко трафик и политиката за съдържанието не пуска чужди картинки)
-const SKY_BACKGROUND = [
+// Снимката на нощното небе (Unsplash) е отгоре; ако не се зареди, остава нощното небе от CSS (само картинки в списъка, цветът е отделно)
+const SKY_FALLBACK = [
   'radial-gradient(1.5px 1.5px at 18% 22%, rgba(255,255,255,.9), transparent)',
   'radial-gradient(1px 1px at 72% 18%, rgba(255,255,255,.8), transparent)',
   'radial-gradient(1.5px 1.5px at 40% 64%, rgba(255,255,255,.7), transparent)',
@@ -14,8 +14,8 @@ const SKY_BACKGROUND = [
   'radial-gradient(1px 1px at 12% 82%, rgba(255,255,255,.7), transparent)',
   'radial-gradient(ellipse at 28% 18%, rgba(124,58,237,.55), transparent 55%)',
   'radial-gradient(ellipse at 82% 72%, rgba(37,99,235,.35), transparent 50%)',
-  '#0B0616',
 ].join(', ');
+const SKY_BACKGROUND = `url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=2000&auto=format&fit=crop'), ${SKY_FALLBACK}`;
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -394,7 +394,8 @@ const Dashboard = () => {
               <div 
                 className="relative w-full lg:w-2/5 h-48 lg:h-auto self-stretch bg-center bg-no-repeat bg-cover"
                 style={{
-                  backgroundImage: SKY_BACKGROUND
+                  backgroundImage: SKY_BACKGROUND,
+                  backgroundColor: '#0B0616'
                 }}
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-[#1f1c27]"></div>

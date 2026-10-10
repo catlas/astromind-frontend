@@ -6,8 +6,8 @@ import { FALLBACK_LIMITS, FALLBACK_PRICES, FALLBACK_SIGNUP_GIFT, FALLBACK_TOPUPS
 import AstroChart from '../components/AstroChart';
 import { sampleChart, sampleExcerpt, sampleMeta } from '../data/sampleReading';
 
-// Нощно небе от CSS: без външна снимка (повече поверителност, по-малко трафик и политиката за съдържанието не пуска чужди картинки)
-const SKY_BACKGROUND = [
+// Снимката на нощното небе (Unsplash) е отгоре; ако не се зареди, остава нощното небе от CSS (само картинки в списъка, цветът е отделно)
+const SKY_FALLBACK = [
   'radial-gradient(1.5px 1.5px at 18% 22%, rgba(255,255,255,.9), transparent)',
   'radial-gradient(1px 1px at 72% 18%, rgba(255,255,255,.8), transparent)',
   'radial-gradient(1.5px 1.5px at 40% 64%, rgba(255,255,255,.7), transparent)',
@@ -15,8 +15,8 @@ const SKY_BACKGROUND = [
   'radial-gradient(1px 1px at 12% 82%, rgba(255,255,255,.7), transparent)',
   'radial-gradient(ellipse at 28% 18%, rgba(124,58,237,.55), transparent 55%)',
   'radial-gradient(ellipse at 82% 72%, rgba(37,99,235,.35), transparent 50%)',
-  '#0B0616',
 ].join(', ');
+const SKY_BACKGROUND = `url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=2000&auto=format&fit=crop'), ${SKY_FALLBACK}`;
 
 // Карта на услуга: иконата и бележката „Основен“ / „Премиум“ следват цените (премиум се плаща само от внесени средства)
 const ServiceCard = ({ icon, tone, premium, title, children }) => (
@@ -311,7 +311,8 @@ const Home = () => {
             <div 
               className="absolute inset-0 bg-cover bg-center opacity-60"
               style={{
-                backgroundImage: SKY_BACKGROUND
+                backgroundImage: SKY_BACKGROUND,
+                backgroundColor: '#0B0616'
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-[#0B0616] via-[#13111C]/80 to-[#13111C]/60 opacity-100"></div>
