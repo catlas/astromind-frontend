@@ -60,13 +60,13 @@ const MemoryPanel = () => {
   const [data, setData] = useState(null);
   const [profiles, setProfiles] = useState([]);
   const [text, setText] = useState('');
-  const [profileName, setProfileName] = useState('');
+  const [profileId, setProfileId] = useState('');          // '' = бележка за мен (основния профил), иначе номер на профил
   const [previewFor, setPreviewFor] = useState('');
   const [msg, setMsg] = useState(null);
 
   const load = async (forProfile = previewFor) => {
     try {
-      const r = await api.get('/memory', { params: forProfile ? { profile_name: forProfile } : {} });
+      const r = await api.get('/memory', { params: forProfile ? { profile_id: forProfile } : {} });
       setData(r.data);
     } catch (err) {
       setMsg({ error: true, text: apiErrorMessage(err, 'Паметта не можа да се зареди.') });
@@ -83,11 +83,22 @@ const MemoryPanel = () => {
   const add = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/memory', { text, profile_name: profileName || null });
+      await api.post('/memory', { text, profile_id: profileId ? Number(profileId) : null });
       setText('');
       await load();
     } catch (err) {
       flash({ error: true, text: apiErrorMessage(err, 'Бележката не беше запазена.') });
+    }
+  };
+
+  // Бележка само с име (от по-стара версия): не се ползва, докато не бъде свързана с профил
+  const link = async (note, id) => {
+    if (!id) return;
+    try {
+      await api.put(`/memory/${note.id}`, { text: note.text, profile_id: Number(id) });
+      await load();
+    } catch (err) {
+      flash({ error: true, text: apiErrorMessage(err, 'Бележката не беше свързана.') });
     }
   };
 
@@ -137,10 +148,10 @@ const MemoryPanel = () => {
             className="w-full bg-[#161022] border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-[#5211d4]"
           />
           <div className="flex flex-wrap items-center gap-3">
-            <select value={profileName} onChange={(e) => setProfileName(e.target.value)}
+            <select value={profileId} onChange={(e) => setProfileId(e.target.value)} aria-label="За кого е бележката"
               className="bg-[#161022] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
               <option value="">За мен (основния ми профил)</option>
-              {profiles.map((p) => <option key={p.id} value={p.name}>Само за {p.name}</option>)}
+              {profiles.map((p) => <option key={p.id} value={String(p.id)}>Само за {p.name}</option>)}
             </select>
             <button disabled={!text.trim()} className="px-5 py-2 rounded-xl bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-sm font-bold disabled:opacity-50">
               Добави
@@ -155,7 +166,18 @@ const MemoryPanel = () => {
               <li key={n.id} className="flex items-start gap-3 py-3">
                 <div className="flex-1">
                   <p className="text-sm text-white">{n.text}</p>
-                  <p className="text-xs text-[#a69db9]">{n.profile_name ? `Само за ${n.profile_name}` : 'За мен (основния ми профил)'}</p>
+                  {n.needs_profile ? (
+                    <div className="mt-1 space-y-1">
+                      <p className="text-xs text-amber-200">Бележката е за „{n.profile_name}“, но не е свързана с профил, затова AI не я ползва.</p>
+                      <select defaultValue="" onChange={(e) => link(n, e.target.value)} aria-label="Свържи бележката с профил"
+                        className="bg-[#161022] border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
+                        <option value="">Избери профил…</option>
+                        {profiles.map((p) => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                      </select>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#a69db9]">{n.profile_id ? `Само за ${n.profile_name}` : 'За мен (основния ми профил)'}</p>
+                  )}
                 </div>
                 <button aria-label="Изтрий" onClick={() => remove(n.id)} className="p-1 text-slate-500 hover:text-red-400" title="Изтрий">
                   <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
@@ -174,7 +196,7 @@ const MemoryPanel = () => {
         <select value={previewFor} onChange={(e) => { setPreviewFor(e.target.value); load(e.target.value); }}
           className="mb-3 bg-[#161022] border border-slate-700 rounded-xl px-3 py-2 text-sm text-white">
           <option value="">Анализ за основния профил</option>
-          {profiles.map((p) => <option key={p.id} value={p.name}>Анализ за {p.name}</option>)}
+          {profiles.map((p) => <option key={p.id} value={String(p.id)}>Анализ за {p.name}</option>)}
         </select>
         <pre className="whitespace-pre-wrap text-xs text-slate-300 bg-[#161022] border border-slate-800 rounded-xl p-4 min-h-[60px]">
           {data.preview || 'Нищо — AI няма да получи допълнителен контекст.'}
@@ -677,8 +699,8 @@ export default function Settings() {
               <div className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-white">Изход от акаунта</p>
-                    <p className="text-xs text-[#a69db9] mt-0.5">Излез от текущата сесия на всички устройства</p>
+                    <p className="text-sm font-medium text-white">Изход от това устройство</p>
+                    <p className="text-xs text-[#a69db9] mt-0.5">Другите устройства остават влезли</p>
                   </div>
                   <button
                     onClick={() => clearSessionAndRedirect(navigate)}
@@ -686,6 +708,23 @@ export default function Settings() {
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>logout</span>
                     Изход
+                  </button>
+                </div>
+
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-white">Изход от всички устройства</p>
+                    <p className="text-xs text-[#a69db9] mt-0.5">Всички влезли устройства, и това, трябва да влязат отново с парола</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try { await api.post('/logout-all'); } catch { /* сесията така или иначе се чисти тук */ }
+                      clearSessionAndRedirect(navigate);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-slate-700 text-slate-300 text-sm rounded-xl transition-all flex-shrink-0"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>devices</span>
+                    Изход навсякъде
                   </button>
                 </div>
 

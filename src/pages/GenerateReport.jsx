@@ -1429,7 +1429,7 @@ const GenerateReport = () => {
                 {jobLimits && (
                   <p className={`text-xs text-center ${jobLimits.can_start ? 'text-gray-400' : 'text-red-300'}`}>
                     {jobLimits.can_start
-                      ? `Остават ${jobLimits.hour_remaining} от ${jobLimits.hour_limit} анализа този час.`
+                      ? `Остават ${jobLimits.hour_remaining} от ${jobLimits.hour_limit} анализа този час и ${jobLimits.day_remaining} от ${jobLimits.day_limit} днес. Неуспешният анализ не се брои.`
                       : jobLimits.active_jobs >= jobLimits.max_active_jobs
                         ? 'Вече имате анализ в процес. Изчакайте го да приключи.'
                         : `Достигнахте лимита за анализи. Нов анализ може ${waitText(jobLimits.retry_after_seconds)}.`}
