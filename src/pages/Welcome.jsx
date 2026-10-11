@@ -38,7 +38,11 @@ export const BigThreeCard = ({ insight }) => {
           ))}
         </div>
         <p className="text-sm text-slate-300 mt-4">
-          <b className="text-white">Преобладава {insight.dominant_element.name.toLowerCase()}.</b> {insight.dominant_element.text}
+          {insight.balanced ? (
+            <b className="text-white">{insight.balance_text}</b>
+          ) : (
+            <><b className="text-white">Преобладава {insight.dominant_element.name.toLowerCase()}.</b> {insight.dominant_element.text}</>
+          )}
         </p>
       </div>
       {insight.note && <p className="text-xs text-yellow-200/80">{insight.note}</p>}

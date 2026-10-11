@@ -93,6 +93,10 @@ export default function History() {
     return () => clearInterval(timer);
   }, [user, hasActiveJob]);
 
+  // Втори ред за отчет: вид анализ (натален, за дата, за период), моментът или периодът и вторият човек
+  const MODE_LABELS = { natal: 'Натален', snapshot: 'За дата', period: 'За период' };
+  const modeLine = (r) => [MODE_LABELS[r.mode], r.when, r.partner ? `с ${r.partner}` : ''].filter(Boolean).join(' · ');
+
   const DAY_MS = 24 * 60 * 60 * 1000;
   const visibleJobs = jobs
     .filter((j) => isActive(j) || (j.status !== 'succeeded' && Date.now() - new Date(`${j.created_at}Z`).getTime() < DAY_MS))
@@ -268,7 +272,7 @@ export default function History() {
                   <p className="text-[#d4c8ed] text-xs font-medium">Cosmic Insights</p>
                 </div>
               </div>
-              <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-white">
+              <button aria-label="Затвори" onClick={() => setIsSidebarOpen(false)} className="p-2 text-white">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -492,6 +496,7 @@ export default function History() {
                           <span className="material-symbols-outlined" style={{ color: typeColors[r.type] || '#a69db9' }}>{typeIcons[r.type] || 'auto_awesome'}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-white truncate">{r.label}</p>
+                            {modeLine(r) && <p className="text-xs text-[#d4c8ed] truncate">{modeLine(r)}</p>}
                             <p className="text-xs text-[#b8aed0]">
                               {formatDate(r.created_at)}{r.profile ? ` · ${r.profile}` : ''}
                               {r.covers ? ` · обхваща ${formatDate(r.covers.from)} – ${formatDate(r.covers.to)}` : ''}
@@ -540,7 +545,7 @@ export default function History() {
                           </span>
                           <div>
                             <p className="text-sm font-medium text-white">{item.label}</p>
-                            <p className="text-xs text-[#b8aed0]">{typeLabels[item.type] || item.type}</p>
+                            <p className="text-xs text-[#b8aed0]">{[typeLabels[item.type] || item.type, modeLine(item)].filter(Boolean).join(' · ')}</p>
                           </div>
                         </div>
                       </td>
@@ -563,14 +568,14 @@ export default function History() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <button
+                          <button aria-label="Преглед на отчета"
                             onClick={() => openReport(item)}
                             className="p-1.5 rounded-lg text-[#d4c8ed] hover:text-white hover:bg-white/10 transition-colors"
                             title="Преглед"
                           >
                             <span className="material-symbols-outlined text-lg">visibility</span>
                           </button>
-                          <button
+                          <button aria-label="Изтрий отчета"
                             onClick={() => setDeleteConfirm(item)}
                             className="p-1.5 rounded-lg text-[#d4c8ed] hover:text-[#f87171] hover:bg-[#f87171]/10 transition-colors"
                             title="Изтрий"
@@ -642,7 +647,7 @@ export default function History() {
                   <p className="text-sm text-[#d4c8ed]">{viewingItem.date} • {viewingItem.profile}</p>
                 </div>
               </div>
-              <button onClick={() => setViewingItem(null)} className="p-2 text-[#d4c8ed] hover:text-white">
+              <button aria-label="Затвори" onClick={() => setViewingItem(null)} className="p-2 text-[#d4c8ed] hover:text-white">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>

@@ -4,6 +4,7 @@ import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 import { BigThreeCard } from './Welcome';
 import { accessLabel, balanceOf, formatEur, giftOf, paidOf } from '../utils/money';
+import { relationLabel } from '../utils/relations';
 
 // Снимката на нощното небе (Unsplash) е отгоре; ако не се зареди, остава нощното небе от CSS (само картинки в списъка, цветът е отделно)
 const SKY_FALLBACK = [
@@ -17,6 +18,15 @@ const SKY_FALLBACK = [
 ].join(', ');
 const SKY_BACKGROUND = `url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=2000&auto=format&fit=crop'), ${SKY_FALLBACK}`;
 
+const CIRCLE_LIMIT = 4;
+const GROUPS = [
+  { id: 'family', label: 'Семейство', relations: ['spouse', 'partner', 'child', 'relative', 'family'] },
+  { id: 'friends', label: 'Приятели', relations: ['friend'] },
+  { id: 'other', label: 'Други', relations: ['other'] },
+];
+const groupOf = (profile) => (GROUPS.find((g) => g.relations.includes(profile.relation)) || GROUPS[2]).id;
+const initials = (name) => (name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || '?';
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -26,6 +36,8 @@ const Dashboard = () => {
   const [recentReports, setRecentReports] = useState([]);
   const [verifyMsg, setVerifyMsg] = useState('');
   const [insight, setInsight] = useState(null);
+  const [circle, setCircle] = useState(null);          // [{ profile, insight }]: първите профили с Голяма тройка (null = още се зарежда)
+  const [circleFilter, setCircleFilter] = useState('all');
 
   const resendVerification = async () => {
     try {
@@ -49,6 +61,19 @@ const Dashboard = () => {
         }
         setUser(sessionUser);
         api.get('/insights/big-three').then((r) => isMounted && setInsight(r.data)).catch(() => {});
+        api.get('/profiles').then(async (r) => {
+          const list = Array.isArray(r.data) ? r.data : [];
+          const shown = list.slice(0, CIRCLE_LIMIT);
+          const loaded = await Promise.all(shown.map(async (profile) => {
+            try {
+              const res = await api.get('/insights/big-three', { params: { profile_id: profile.id } });
+              return { profile, insight: res.data };
+            } catch {
+              return { profile, insight: null };        // профил без място на раждане: показва се без знаци
+            }
+          }));
+          if (isMounted) setCircle({ all: list, shown: loaded });
+        }).catch(() => isMounted && setCircle({ all: [], shown: [] }));
         try {
           await migrateLocalData();
           const reports = await fetchReports(3);
@@ -206,7 +231,7 @@ const Dashboard = () => {
                   <p className="text-[#a69db9] text-xs font-medium">Cosmic Insights</p>
                 </div>
               </div>
-              <button 
+              <button aria-label="Затвори менюто" 
                 onClick={() => setIsSidebarOpen(false)}
                 className="p-2 text-white"
               >
@@ -448,38 +473,66 @@ const Dashboard = () => {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* User Profile Card */}
-                <div className="group p-4 rounded-xl bg-[#1f1c27] border border-slate-800/50 hover:border-[#5211d4]/50 transition-all shadow-sm">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-slate-700 border-2 border-[#5211d4]"></div>
-                      <div>
-                        <h3 className="font-bold text-white">{user.full_name || 'Потребител'} (Ти)</h3>
-                        <p className="text-xs text-[#a69db9]">—</p>
-                      </div>
-                    </div>
-                    <button className="text-slate-400 hover:text-white transition-colors">
-                      <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                {(() => {
+                  if (circle === null) {
+                    return <div className="p-4 rounded-xl bg-[#1f1c27] border border-slate-800/50 text-sm text-slate-400">Зареждане на близките…</div>;
+                  }
+                  const present = GROUPS.filter((g) => circle.all.some((p) => groupOf(p) === g.id));
+                  const visible = circle.shown.filter(({ profile }) => circleFilter === 'all' || groupOf(profile) === circleFilter);
+                  const chip = (id, label) => (
+                    <button key={id} type="button" onClick={() => setCircleFilter(id)} aria-pressed={circleFilter === id}
+                      className={`px-3 py-1 rounded-full text-xs border ${circleFilter === id ? 'bg-[#5211d4] border-[#5211d4] text-white' : 'border-slate-700 text-slate-300 hover:border-[#5211d4]/60'}`}>
+                      {label}
                     </button>
-                  </div>
-                  <div className="flex gap-2 mb-4">
-                    <div className="px-2 py-1 rounded bg-white/5 text-xs font-medium text-slate-300 flex items-center gap-1">
-                      <span className="text-orange-400">☀</span> —
-                    </div>
-                    <div className="px-2 py-1 rounded bg-white/5 text-xs font-medium text-slate-300 flex items-center gap-1">
-                      <span className="text-blue-300">☾</span> —
-                    </div>
-                    <div className="px-2 py-1 rounded bg-white/5 text-xs font-medium text-slate-300 flex items-center gap-1">
-                      <span className="text-gray-400">↑</span> —
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => navigate('/generate-report')}
-                    className="w-full py-2 rounded-lg border border-[#5211d4]/30 text-[#5211d4] hover:bg-[#5211d4] hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-2 group-hover:bg-[#5211d4] group-hover:text-white"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">auto_awesome</span> Ново четене
-                  </button>
-                </div>
+                  );
+                  if (circle.all.length === 0) {
+                    return (
+                      <div className="p-4 rounded-xl bg-[#1f1c27] border border-slate-800/50">
+                        <h3 className="font-bold text-white">{user.full_name || 'Потребител'} (Ти)</h3>
+                        <p className="text-sm text-slate-400 mt-1 mb-4">Още няма профил с данни за раждане. Добавете го, за да виждате Слънцето, Луната и Асцендента си тук.</p>
+                        <button onClick={() => navigate('/profiles')} className="w-full py-2 rounded-lg border border-[#5211d4]/30 text-[#5211d4] hover:bg-[#5211d4] hover:text-white text-sm font-medium transition-colors">Добави профил</button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <>
+                      {present.length > 1 && (
+                        <div className="md:col-span-2 flex flex-wrap gap-2" role="group" aria-label="Филтър по близки">
+                          {chip('all', 'Всички')}
+                          {present.map((g) => chip(g.id, g.label))}
+                        </div>
+                      )}
+                      {visible.map(({ profile, insight: info }) => {
+                        const self = profile.is_primary || profile.relation === 'self';
+                        const sign = (item) => item?.sign_bg || '—';
+                        return (
+                          <div key={profile.id} className="group p-4 rounded-xl bg-[#1f1c27] border border-slate-800/50 hover:border-[#5211d4]/50 transition-all shadow-sm">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-12 h-12 shrink-0 rounded-full bg-slate-700 border-2 border-[#5211d4] flex items-center justify-center text-sm font-bold text-white" aria-hidden="true">{initials(profile.name)}</div>
+                                <div className="min-w-0">
+                                  <h3 className="font-bold text-white truncate">{profile.name}{self ? ' (Ти)' : ''}</h3>
+                                  <p className="text-xs text-[#a69db9]">{self ? 'Основен профил' : relationLabel(profile.relation)}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 mb-4">
+                              <div className="px-2 py-1 rounded bg-white/5 text-xs font-medium text-slate-300 flex items-center gap-1" title="Слънце"><span className="text-orange-400" aria-hidden="true">☀</span> {sign(info?.sun)}</div>
+                              <div className="px-2 py-1 rounded bg-white/5 text-xs font-medium text-slate-300 flex items-center gap-1" title="Луна"><span className="text-blue-300" aria-hidden="true">☾</span> {sign(info?.moon)}</div>
+                              <div className="px-2 py-1 rounded bg-white/5 text-xs font-medium text-slate-300 flex items-center gap-1" title={info?.ascendant ? 'Асцендент' : 'Асцендентът изисква час на раждане'}><span className="text-gray-400" aria-hidden="true">↑</span> {sign(info?.ascendant)}</div>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/generate-report?profile=${encodeURIComponent(profile.name)}`)}
+                              className="w-full py-2 rounded-lg border border-[#5211d4]/30 text-[#5211d4] hover:bg-[#5211d4] hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">auto_awesome</span> Ново четене
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
 
                 {/* Add Profile Button */}
                 <button

@@ -252,9 +252,9 @@ const Balance = () => {
                   <p className="text-slate-400 text-sm mb-1">Получавате в баланса</p>
                   <span className="text-4xl font-extrabold">{formatEur(tier.credit_cents)}</span>
                   {bonus > 0 && (
-                    <span className="ml-3 align-middle text-xs font-bold bg-green-500/15 text-green-300 border border-green-500/30 px-2 py-1 rounded-full">
-                      +{formatEur(bonus)} бонус
-                    </span>
+                    <p className="mt-2 inline-block text-xs font-bold bg-green-500/15 text-green-300 border border-green-500/30 px-2 py-1 rounded-lg">
+                      Общо {formatEur(tier.credit_cents)} = {formatEur(tier.amount_cents)} зареждане + {formatEur(bonus)} бонус
+                    </p>
                   )}
                   <p className="text-slate-400 text-sm mt-3">Плащате {formatEur(tier.amount_cents)}</p>
                   <p className="text-slate-500 text-xs mt-1">Цената е с включен ДДС, когато е приложимо.</p>
@@ -349,7 +349,8 @@ const Balance = () => {
               <h4 className="font-bold mb-2">Мога ли да си върна парите?</h4>
               <p className="text-slate-400 text-sm">
                 Условията са в <a href="#/legal/refunds" className="text-purple-400 underline">Политиката за връщане</a>.
-                Подаръкът и бонусът към пакетите не се връщат в пари.
+                Подаръкът и бонусът към пакетите не се връщат в пари. Бонусът към пакета се влива в баланса и може да плаща и премиум
+                услуги; подаръкът при регистрация е отделен и покрива само основните анализи.
               </p>
             </div>
           </div>

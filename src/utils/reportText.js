@@ -8,6 +8,9 @@ const RULE = /^\s*(?:[-*_]{3,}|[━─═]{3,})\s*$/;
 const BULLET = /^\s*[-*•]\s+(.*)$/;
 const ORDERED = /^\s*\d{1,3}[.)]\s+(.*)$/;
 const HEADING = /^\s*(#{1,6})\s+(.*?)\s*#*\s*$/;
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_RULE = /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+const cells = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
 
 const ENTITIES = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&nbsp;': ' ' };
 const unescapeEntities = (s) => s.replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (m) => ENTITIES[m]);
@@ -27,7 +30,7 @@ export const normalizeMarkup = (text) => {
   return unescapeEntities(s);
 };
 
-// -> [{ kind: 'h' | 'p' | 'ul' | 'ol' | 'hr', level, items: [текст с **, *] }]
+// -> [{ kind: 'h' | 'p' | 'ul' | 'ol' | 'hr' | 'table', level, items: [текст с **, *], rows, header }]
 export const parseReport = (text) => {
   const blocks = [];
   let paragraph = [];
@@ -35,8 +38,21 @@ export const parseReport = (text) => {
     if (paragraph.length) blocks.push({ kind: 'p', level: 0, items: [paragraph.join(' ')] });
     paragraph = [];
   };
+  let table = [];
+  // Редове, които почват и свършват с |, са таблица (две или повече поредни); иначе са обикновен текст
+  const flushTable = () => {
+    const rows = table.filter((line) => !TABLE_RULE.test(line));
+    if (table.length >= 2 && rows.length) {
+      blocks.push({ kind: 'table', level: 0, items: [], rows: rows.map(cells), header: rows.length !== table.length });
+    } else {
+      table.forEach((line) => paragraph.push(line.trim()));
+    }
+    table = [];
+  };
   normalizeMarkup(text).split('\n').forEach((raw) => {
     const line = raw.replace(/\s+$/, '');
+    if (TABLE_ROW.test(line)) { flush(); table.push(line); return; }
+    if (table.length) { flushTable(); flush(); }
     if (!line.trim()) { flush(); return; }
     if (RULE.test(line)) { flush(); blocks.push({ kind: 'hr', level: 0, items: [] }); return; }
     const heading = HEADING.exec(line);
@@ -53,6 +69,7 @@ export const parseReport = (text) => {
     }
     paragraph.push(line.trim());
   });
+  if (table.length) flushTable();
   flush();
   return blocks;
 };
@@ -75,8 +92,8 @@ export const inlineRuns = (text) => {
 
 export const plainText = (text) => inlineRuns(text).map((run) => run.text).join('');
 
-// Заглавията за съдържание (ниво 1-2)
-export const outline = (blocks) => blocks
+// Заглавията за съдържание (ниво 1-2). prefix прави идентификаторите уникални за всеки показан отчет на страницата.
+export const outline = (blocks, prefix = 'r') => blocks
   .map((block, index) => ({ block, index }))
   .filter(({ block }) => block.kind === 'h' && block.level <= 2)
-  .map(({ block, index }) => ({ id: `r-${index}`, title: plainText(block.items[0]), level: block.level }));
+  .map(({ block, index }) => ({ id: `${prefix}-${index}`, title: plainText(block.items[0]), level: block.level }));

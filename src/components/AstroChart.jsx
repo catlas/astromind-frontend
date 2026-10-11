@@ -33,6 +33,24 @@ const PLANET_SYMBOLS = {
   Chiron: '⚷',
 };
 
+const SIGN_BG = {
+  Aries: 'Овен', Taurus: 'Телец', Gemini: 'Близнаци', Cancer: 'Рак', Leo: 'Лъв', Virgo: 'Дева', Libra: 'Везни',
+  Scorpio: 'Скорпион', Sagittarius: 'Стрелец', Capricorn: 'Козирог', Aquarius: 'Водолей', Pisces: 'Риби',
+};
+
+// Подсказка за планета: знак, градус и минута, дом и посока на движение (не само абсолютните градуси)
+export const planetTip = (name, longitude, house, speed) => {
+  const lon = ((longitude % 360) + 360) % 360;
+  const sign = SIGN_BG[ZODIAC_SIGNS[Math.floor(lon / 30)].name];
+  const inSign = lon % 30;
+  const deg = Math.floor(inSign);
+  const min = Math.min(59, Math.floor((inSign - deg) * 60));
+  const parts = [`${name}: ${sign} ${deg}°${String(min).padStart(2, '0')}′`];
+  if (house) parts.push(`${house}-ти дом`);
+  if (typeof speed === 'number') parts.push(speed < 0 ? 'ретрограден' : 'директен');
+  return parts.join(' · ');
+};
+
 const PLANET_NAMES = {
   Sun: 'Слънце',
   Moon: 'Луна',
@@ -177,7 +195,6 @@ export default function AstroChart({ data }) {
       const degree = `${Math.floor(longitude % 30)}°${planetData.speed < 0 ? '℞' : ''}`;
       const symbol = PLANET_SYMBOLS[planetName] || '•';
       const name = PLANET_NAMES[planetName] || planetName;
-      const speed = planetData.speed ? planetData.speed.toFixed(2) : 'N/A';
 
       return (
         <g key={planetName}>
@@ -202,9 +219,7 @@ export default function AstroChart({ data }) {
           >
             {symbol}
           </text>
-          <title>
-            {name}: {longitude.toFixed(2)}° (скорост: {speed}°/ден)
-          </title>
+          <title>{planetTip(name, longitude, planetData.house, planetData.speed)}</title>
         </g>
       );
     });
@@ -311,8 +326,10 @@ export default function AstroChart({ data }) {
   };
 
   return (
-    <div className="flex items-center justify-center p-4 w-full" style={{ width: '100%', overflow: 'visible' }}>
+    <div className="flex flex-col items-center justify-center p-4 w-full" style={{ width: '100%', overflow: 'visible' }}>
       <svg
+        role="img"
+        aria-label="Кръгова диаграма на картата: зодиакален пръстен, домове и планети"
         viewBox="0 0 840 840"
         width="840"
         height="840"
@@ -338,6 +355,10 @@ export default function AstroChart({ data }) {
         {/* Планети */}
         {renderPlanets()}
       </svg>
+      <p className="text-xs text-slate-400 mt-2 max-w-xl text-center">
+        Символите на планетите са леко раздалечени, за да се четат. Жълтата чертичка на вътрешния пръстен е точната позиция.
+        Посочете планета за знак, градус, дом и посока на движение.
+      </p>
       {data.time_known === false && (
         <p className="sr-only">Часът на раждане е неизвестен: колелото е без домове, Асцендент и MC и без Луна.</p>
       )}

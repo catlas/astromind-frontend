@@ -202,7 +202,7 @@ const Home = () => {
                 <span className="material-symbols-outlined text-[#5211d4]">auto_awesome</span>
                 <h2 className="text-white text-lg font-bold">AstroMind</h2>
               </div>
-              <button 
+              <button aria-label="Затвори" 
                 onClick={() => setIsMenuOpen(false)}
                 className="text-white p-2"
               >
@@ -591,7 +591,7 @@ const Home = () => {
                 <li><b>Хостинг и база данни</b> (Render, Франкфурт): акаунтът, профилите и анализите ви.</li>
                 <li><b>Плащане</b> (Stripe, когато е включено): картата не стига до нас.</li>
                 <li><b>Google Fonts</b>: шрифтовете се зареждат от Google, който вижда адреса ви.</li>
-                <li>Местата се търсят в вградена база (GeoNames), без заявка към трети страни.</li>
+                <li>Координатите се проверяват във вградената GeoNames база. При избор на „Друг град“ AI може да помогне с изписването: към доставчика се изпращат въведеният град и държава.</li>
               </ul>
               <p>Подробности: <a href="#/legal/privacy" className="underline text-purple-300">Политика за поверителност</a>. Профилите и анализите се изтриват от Настройки.</p>
             </div>

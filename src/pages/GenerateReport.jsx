@@ -917,7 +917,7 @@ const GenerateReport = () => {
                   <p className="text-[#a69db9] text-xs font-medium">Cosmic Insights</p>
                 </div>
               </div>
-              <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-white">
+              <button aria-label="Затвори" onClick={() => setIsSidebarOpen(false)} className="p-2 text-white">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>

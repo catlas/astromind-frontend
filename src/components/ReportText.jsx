@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useId, useMemo } from 'react';
 import { inlineRuns, outline, parseReport } from '../utils/reportText';
 
 // Безопасно показване на текста на отчета (Фаза 13): блокове и React елементи, без HTML. Един и същ компонент за новия
@@ -20,8 +20,9 @@ const HEADING_CLASS = {
 };
 
 export default function ReportText({ text, toc = false, className = '' }) {
+  const uid = useId().replace(/:/g, '');               // уникален за всеки показан отчет: заглавията не се дублират между месеци и отчети
   const blocks = useMemo(() => parseReport(text), [text]);
-  const headings = useMemo(() => (toc ? outline(blocks) : []), [blocks, toc]);
+  const headings = useMemo(() => (toc ? outline(blocks, `r${uid}`) : []), [blocks, toc, uid]);
 
   if (!blocks.length) return <p className="text-slate-400">Няма съдържание.</p>;
 
@@ -41,7 +42,7 @@ export default function ReportText({ text, toc = false, className = '' }) {
         </nav>
       )}
       {blocks.map((block, index) => {
-        const id = `r-${index}`;
+        const id = `r${uid}-${index}`;
         switch (block.kind) {
           case 'h': {
             const Tag = block.level <= 1 ? 'h2' : block.level === 2 ? 'h3' : 'h4';
@@ -61,6 +62,31 @@ export default function ReportText({ text, toc = false, className = '' }) {
             );
           case 'hr':
             return <hr key={index} className="border-slate-700 my-5" />;
+          case 'table': {
+            const [head, ...body] = block.header ? block.rows : [null, ...block.rows];
+            const width = Math.max(...block.rows.map((row) => row.length));
+            const cell = (row, c) => (c < row.length ? row[c] : '');
+            return (
+              <div key={index} className="overflow-x-auto">
+                <table className="min-w-full text-sm border-collapse">
+                  {head && (
+                    <thead>
+                      <tr>{Array.from({ length: width }, (_, c) => (
+                        <th key={c} scope="col" className="border border-slate-700 bg-slate-800/60 px-3 py-2 text-left font-semibold text-white"><Inline text={cell(head, c)} /></th>
+                      ))}</tr>
+                    </thead>
+                  )}
+                  <tbody>
+                    {body.map((row, r) => (
+                      <tr key={r}>{Array.from({ length: width }, (_, c) => (
+                        <td key={c} className="border border-slate-700 px-3 py-2 align-top"><Inline text={cell(row, c)} /></td>
+                      ))}</tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          }
           default:
             return <p key={index}><Inline text={block.items[0]} /></p>;
         }

@@ -324,7 +324,7 @@ const Profiles = () => {
                   <p className="text-[#a69db9] text-xs font-medium">Cosmic Insights</p>
                 </div>
               </div>
-              <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-white">
+              <button aria-label="Затвори" onClick={() => setIsSidebarOpen(false)} className="p-2 text-white">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -499,13 +499,13 @@ const Profiles = () => {
                       </div>
                     </div>
                     <div className={`flex items-center gap-1 transition-opacity ${hoveredId === profile.id ? 'opacity-100' : 'opacity-0'}`}>
-                      <button
+                      <button aria-label="Редактирай профила"
                         onClick={(e) => { e.stopPropagation(); handleEdit(profile); }}
                         className="p-2 text-slate-400 hover:text-[#5211d4] transition-colors"
                       >
                         <span className="material-symbols-outlined text-[18px]">edit</span>
                       </button>
-                      <button
+                      <button aria-label="Изтрий профила"
                         onClick={(e) => { e.stopPropagation(); handleDelete(profile.id); }}
                         className="p-2 text-slate-400 hover:text-red-400 transition-colors"
                       >

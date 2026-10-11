@@ -21,11 +21,14 @@ const sidebarButtonClass = (isActive) =>
       : 'text-[#a69db9] hover:bg-white/5'
   }`;
 
-const Toggle = ({ checked, onChange }) => (
+const Toggle = ({ checked, onChange, label }) => (
   <button
     type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={label}
     onClick={() => onChange(!checked)}
-    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 ${
       checked ? 'bg-[#5211d4]' : 'bg-slate-700'
     }`}
   >
@@ -114,7 +117,7 @@ const MemoryPanel = () => {
             <p className="text-white text-sm font-medium">Използвай паметта в анализите</p>
             <p className="text-xs text-[#a69db9]">Когато е изключено, AI не вижда нито една от бележките ви.</p>
           </div>
-          <Toggle checked={data.enabled} onChange={toggle} />
+          <Toggle checked={data.enabled} onChange={toggle} label="Използвай паметта в анализите" />
         </div>
         <p className="text-xs text-[#a69db9]">
           AI помни само това, което напишете тук. Нищо не се добавя автоматично, а предишните ви анализи не се подават като факти.
@@ -154,7 +157,7 @@ const MemoryPanel = () => {
                   <p className="text-sm text-white">{n.text}</p>
                   <p className="text-xs text-[#a69db9]">{n.profile_name ? `Само за ${n.profile_name}` : 'За мен (основния ми профил)'}</p>
                 </div>
-                <button onClick={() => remove(n.id)} className="p-1 text-slate-500 hover:text-red-400" title="Изтрий">
+                <button aria-label="Изтрий" onClick={() => remove(n.id)} className="p-1 text-slate-500 hover:text-red-400" title="Изтрий">
                   <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
                 </button>
               </li>
@@ -379,7 +382,7 @@ export default function Settings() {
           <p className="text-[#a69db9] text-xs font-medium">Cosmic Insights</p>
         </div>
         {mobile && (
-          <button onClick={() => setIsSidebarOpen(false)} className="ml-auto p-2 text-white">
+          <button aria-label="Затвори" onClick={() => setIsSidebarOpen(false)} className="ml-auto p-2 text-white">
             <span className="material-symbols-outlined">close</span>
           </button>
         )}
