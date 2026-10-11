@@ -488,6 +488,16 @@ const GenerateReport = () => {
         setMonthlyResults([...state.months]);
         setResult((prev) => ({ ...prev, interpretation: formatInterpretation(state.months) }));
         break;
+      case 'part_replaced': {
+        // Финалната проверка на целия отчет поправи месец (противоречие с друга част): показваме поправения текст
+        const index = state.months.findIndex((m) => !m.isOverview && m.month === event.title);
+        if (index >= 0) {
+          state.months[index] = { ...state.months[index], text: event.text };
+          setMonthlyResults([...state.months]);
+          setResult((prev) => ({ ...prev, interpretation: formatInterpretation(state.months) }));
+        }
+        break;
+      }
       case 'overview_start':
         setLoadingMessage('Съставяне на общия преглед на периода...');
         break;
@@ -1603,6 +1613,16 @@ const GenerateReport = () => {
                   Въведете данни и изчислете карта,<br />
                   за да видите AI интерпретация
                 </p>
+              </div>
+            )}
+
+            {loading && result && result.interpretation && (
+              <div
+                className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+                role="status"
+                data-testid="preliminary-note"
+              >
+                Предварителен текст — анализът още се проверява. Окончателният отчет е този, който остава след края на проверката.
               </div>
             )}
 
