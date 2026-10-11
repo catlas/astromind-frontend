@@ -498,6 +498,14 @@ export default function History() {
                             <p className="text-sm font-medium text-white truncate">{r.label}</p>
                             {modeLine(r) && <p className="text-xs text-[#d4c8ed] truncate">{modeLine(r)}</p>}
                             <p className="text-xs text-[#b8aed0]">
+                              {r.legacy && (
+                                <span
+                                  title="Записан преди запазването на изчисленията: износът е възстановен от входните данни, без гаранция за същите числа"
+                                  className="mr-2 rounded border border-[#6b5a8a] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[#d4c8ed]"
+                                >
+                                  Стар отчет
+                                </span>
+                              )}
                               {formatDate(r.created_at)}{r.profile ? ` · ${r.profile}` : ''}
                               {r.covers ? ` · обхваща ${formatDate(r.covers.from)} – ${formatDate(r.covers.to)}` : ''}
                             </p>
@@ -545,7 +553,17 @@ export default function History() {
                           </span>
                           <div>
                             <p className="text-sm font-medium text-white">{item.label}</p>
-                            <p className="text-xs text-[#b8aed0]">{[typeLabels[item.type] || item.type, modeLine(item)].filter(Boolean).join(' · ')}</p>
+                            <p className="text-xs text-[#b8aed0]">
+                              {item.legacy && (
+                                <span
+                                  title="Записан преди запазването на изчисленията: износът е възстановен от входните данни, без гаранция за същите числа"
+                                  className="mr-2 rounded border border-[#6b5a8a] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[#d4c8ed]"
+                                >
+                                  Стар отчет
+                                </span>
+                              )}
+                              {[typeLabels[item.type] || item.type, modeLine(item)].filter(Boolean).join(' · ')}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -660,6 +678,11 @@ export default function History() {
                 )}
               </div>
             </div>
+            {viewingItem.legacy && !viewingItem.failed && (
+              <p className="px-6 pt-4 text-xs text-[#d4c8ed]" data-testid="legacy-note">
+                Стар отчет: записан е преди запазването на изчисленията. Износът му е възстановен от входните данни, без гаранция, че числата са същите като при генерирането.
+              </p>
+            )}
             <div className="p-6 border-t border-[#302240] flex flex-wrap items-start justify-between gap-3">
               {!viewLoading && !viewingItem.failed ? <ReportExport reportId={viewingItem.id} /> : <span />}
               <button
