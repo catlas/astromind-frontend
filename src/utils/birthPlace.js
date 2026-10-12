@@ -7,7 +7,9 @@ export const OTHER = '__other';
 //   mode 'list'  - град от списъка (city е името му или '' при непосочен град)
 //   mode 'other' - друго място: city и country са свободен текст
 // lat и lon са низове, защото идват от полета за въвеждане
-export const emptyPlace = () => ({ mode: 'list', city: '', country: '', lat: '', lon: '' });
+//   meta     откъде са координатите, като ЕДНА стойност с точката (R07): null (няма избрана точка или е запазен профил),
+//            { source: 'list' | 'geonames' | 'ai' | 'manual', verified, confirmed, geoname_id, canonical_city, country_code, timezone, data_version }
+export const emptyPlace = () => ({ mode: 'list', city: '', country: '', lat: '', lon: '', meta: null });
 
 export const findListCity = (name) => bulgarianCities.find((c) => c.name === name) || null;
 
@@ -23,6 +25,7 @@ export const normalizePlace = (raw) => {
     country: toStr(p.country),
     lat: toStr(p.lat),
     lon: toStr(p.lon),
+    meta: p.meta && typeof p.meta === 'object' ? p.meta : null,
   };
 };
 
@@ -45,7 +48,7 @@ export const placeFromParts = (rawLabel, rawLat, rawLon) => {
 
   const listed = findListCity(label);
   if (listed) {
-    return { mode: 'list', city: listed.name, country: '', lat: lat || String(listed.lat), lon: lon || String(listed.lon) };
+    return { mode: 'list', city: listed.name, country: '', lat: lat || String(listed.lat), lon: lon || String(listed.lon), meta: null };
   }
   if (!label && !lat && !lon) return emptyPlace();
 
@@ -57,6 +60,7 @@ export const placeFromParts = (rawLabel, rawLat, rawLon) => {
     country: cut === -1 ? '' : label.slice(cut + 1).trim(),
     lat,
     lon,
+    meta: null,
   };
 };
 
@@ -64,8 +68,58 @@ export const placeFromParts = (rawLabel, rawLat, rawLon) => {
 export const placeFromProfile = (profile) =>
   placeFromParts(profile?.birth_place, profile?.lat, profile?.lon);
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Атомарен избор на място (R07): град, държава, координати, идентификатор, зона и източник са една стойност. Всяка промяна на
+// града или държавата обезсилва избраната точка (координати и meta); резултат от търсене не се прилага към друг текст.
+// ---------------------------------------------------------------------------------------------------------------------
+export const AI_UNCONFIRMED = 'Координатите са предложени от AI и не са проверени. Потвърдете ги или ги въведете ръчно.';
+
+// Промяна на града или държавата: старата точка (напр. Париж) не важи за новия текст (напр. Springfield)
+export const editPlaceText = (place, field, value) => ({ ...place, [field]: value, lat: '', lon: '', meta: null });
+
+// Ръчно въведена координата: ясно означена като ръчна и потвърдена от самото въвеждане
+export const editCoordinate = (place, field, value) => ({
+  ...place,
+  [field]: value,
+  meta: { source: 'manual', verified: false, confirmed: true },
+});
+
+// Град от списъка на България (проверен списък, зона Europe/Sofia)
+export const selectListCity = (city) => ({
+  mode: 'list', city: city.name, country: '', lat: String(city.lat), lon: String(city.lon),
+  meta: { source: 'list', verified: true, confirmed: true, timezone: 'Europe/Sofia' },
+});
+
+const geonamesMeta = (found) => ({
+  source: 'geonames', verified: true, confirmed: true, geoname_id: found.geoname_id ?? found.id ?? null,
+  canonical_city: found.canonical_city || found.city || '', country_code: found.country_code || '',
+  timezone: found.timezone || '', data_version: found.data_version || '',
+});
+
+// Отговор на /geocode: двусмислие или липса не оставят стара точка; GeoNames записва всичко заедно; AI е непотвърден
+export const applyGeocodeResult = (place, found) => {
+  if (!found || found.status === 'ambiguous') return { ...place, lat: '', lon: '', meta: null };
+  if (found.verified) return { ...place, lat: String(found.lat), lon: String(found.lon), meta: geonamesMeta(found) };
+  return { ...place, lat: String(found.lat), lon: String(found.lon), meta: { source: 'ai', verified: false, confirmed: false } };
+};
+
+// Избран кандидат от няколко места със същото име
+export const choosePlace = (place, candidate) => ({
+  ...place, lat: String(candidate.lat), lon: String(candidate.lon), meta: geonamesMeta({ ...candidate, canonical_city: candidate.city }),
+});
+
+export const confirmAiPlace = (place) => ({ ...place, meta: { ...(place.meta || {}), source: 'ai', confirmed: true } });
+
+// null, когато мястото може да се изпрати; иначе съобщение на български
+export const placeBlocker = (place) => {
+  if (place?.mode === 'other' && place.meta?.source === 'ai' && !place.meta.confirmed) return AI_UNCONFIRMED;
+  return null;
+};
+
 // Проверява координатите и връща { lat, lon } като числа или { error } на български
 export const parseCoordinates = (place) => {
+  const blocked = placeBlocker(place);
+  if (blocked) return { error: blocked };
   const toNumber = (text) => {
     const t = String(text ?? '').trim();
     return t === '' ? NaN : Number(t);

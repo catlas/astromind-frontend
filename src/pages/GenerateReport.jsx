@@ -9,10 +9,10 @@ import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
 import BirthMoment from '../components/BirthMoment';
 import ForecastZone from '../components/ForecastZone';
 import { browserZone, nowInZone } from '../utils/forecastZone';
-import { emptyPlace, normalizePlace, placeFromParts, placeFromProfile, placeLabel } from '../utils/birthPlace';
+import { emptyPlace, normalizePlace, placeBlocker, placeFromParts, placeFromProfile, placeLabel } from '../utils/birthPlace';
 import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, apiErrorMessage, fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
-import { CONTEXT_OPTIONS, relationLabel, suggestContext } from '../utils/relations';
+import { CONTEXT_OPTIONS, PARENT_OPTIONS, relationLabel, suggestContext, suggestParentRole } from '../utils/relations';
 import { accessLabel, availableFor, balanceOf, formatEur, periodMonths, quoteFor, withBalance } from '../utils/money';
 import {
   STAGE_MESSAGES, STAGE_STEPS, cancelJob, createJob, fetchJob, fetchJobLimits, forgetJob, isActive, newKey,
@@ -136,6 +136,7 @@ const GenerateReport = () => {
   const [partnerState, setPartnerState] = useState({ blocking: false, zone: '' });
   // Отношения между двамата: null = още не е избрано (важи предложението по групата на профила), '' = общо взаимодействие
   const [relationship, setRelationship] = useState(null);
+  const [parentRole, setParentRole] = useState(null);   // null = по предложението (ако има); '' = не уточнявам; 'user' | 'partner'
 
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -260,6 +261,8 @@ const GenerateReport = () => {
   // Отношения между двамата: избраното от човека, иначе предложение по групата на втория профил (само когато първият е основният)
   const suggestedRelationship = suggestContext(selectedProfile, partnerProfile);
   const effectiveRelationship = relationship ?? suggestedRelationship;
+  const suggestedParent = suggestParentRole(selectedProfile, partnerProfile);
+  const effectiveParentRole = effectiveRelationship === 'parent_child' ? (parentRole ?? suggestedParent) : '';
   const sameProfile = Boolean(enablePartner && profileChoice && partnerChoice && profileChoice === partnerChoice);
   const formBlocked = sameProfile || birthState.blocking || (enablePartner && partnerState.blocking)
     || (enableTransit && !isDynamic && targetState.blocking);
@@ -316,6 +319,7 @@ const GenerateReport = () => {
     setUnknownTime(Boolean(profile.unknown_time));
     setBirthFold(settings.birthFold ?? null);
     setRelationship(settings.relationship ?? null);
+    setParentRole(settings.parentRole ?? null);
     setBirthPlace(placeFromProfile(profile));
     setEnableTransit(Boolean(settings.enableTransit));
     if (settings.transitData) setTransitData(settings.transitData);
@@ -343,6 +347,7 @@ const GenerateReport = () => {
     const value = e.target.value;
     setPartnerChoice(value);
     setRelationship(null);          // нов втори човек: важи предложението по неговата група
+    setParentRole(null);
     if (!value) {
       setPartnerData(emptyPartnerData);
       setPartnerPlace(emptyPlace());
@@ -380,6 +385,7 @@ const GenerateReport = () => {
       partnerUnknownTime,
       partnerFold,
       relationship: relationship ?? undefined,
+      parentRole: parentRole ?? undefined,
       birthFold,
     };
     try {
@@ -399,7 +405,7 @@ const GenerateReport = () => {
       } else if (name.trim() && !savedProfiles.some((p) => p.name === name.trim())) {
         await upsertProfile({
           name: name.trim(),
-          relation: 'self',
+          relation: 'other',          // ръчно въведен именуван човек е „Друг“, не втори „Аз“: собственикът е основният профил (R08)
           gender: null,
           birth_date: formData.date,
           birth_time: unknownTime ? '' : (formData.time || ''),
@@ -666,6 +672,9 @@ const GenerateReport = () => {
       if (!formData.date || (!unknownTime && !formData.time) || !birthPlace.lat || !birthPlace.lon) {
         throw new Error('Моля попълнете всички задължителни полета');
       }
+      // Предложени от AI и непотвърдени координати не стигат до анализа (R07); същото за втория човек
+      const placeProblem = placeBlocker(birthPlace) || (enablePartner ? placeBlocker(partnerPlace) : null);
+      if (placeProblem) throw new Error(placeProblem);
 
       const lat = parseFloat(birthPlace.lat);
       const lon = parseFloat(birthPlace.lon);
@@ -755,6 +764,7 @@ const GenerateReport = () => {
           requestData.partner_lon = partnerLon;
           if (partnerProfile) requestData.partner_profile_id = partnerProfile.id;
           if (effectiveRelationship) requestData.relationship = effectiveRelationship;
+          if (effectiveRelationship === 'parent_child' && effectiveParentRole) requestData.parent_role = effectiveParentRole;
           const secondGender = knownGender(partnerProfile, partnerData.partner_name);
           if (secondGender) requestData.partner_gender = secondGender;
         }
@@ -1285,6 +1295,24 @@ const GenerateReport = () => {
                         >
                           {CONTEXT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
+                        {effectiveRelationship === 'parent_child' && (
+                          <div className="mt-3">
+                            <label htmlFor="parent-role" className="block text-sm font-medium mb-2 text-gray-300">Кой е родителят</label>
+                            <select
+                              id="parent-role"
+                              value={effectiveParentRole}
+                              onChange={(e) => setParentRole(e.target.value)}
+                              className="w-full px-4 py-2 bg-slate-700/50 border border-pink-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-white"
+                            >
+                              {PARENT_OPTIONS(name.trim(), partnerData.partner_name?.trim()).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                            <p className="mt-1 text-xs text-gray-400">
+                              {parentRole === null && suggestedParent
+                                ? 'Предложено: основният профил е родителят на профил от група „Дете“. Можете да го промените.'
+                                : 'Ролите не се гадаят по име, пол или възраст. Без избор анализът не казва кой е родителят.'}
+                            </p>
+                          </div>
+                        )}
                         <p className="mt-1 text-xs text-gray-400">
                           {relationship === null && suggestedRelationship
                             ? `Предложено по групата „${relationLabel(partnerProfile?.relation)}“ на профила. Можете да го промените; важи само за този анализ.`

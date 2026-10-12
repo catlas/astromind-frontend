@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Map as MapIcon, MapPin } from 'lucide-react';
 import { bulgarianCities } from '../utils/bulgarianCities';
 import { apiErrorMessage, geocodePlace } from '../utils/api';
-import { OTHER, findListCity } from '../utils/birthPlace';
+import {
+  OTHER, applyGeocodeResult, choosePlace, confirmAiPlace, editCoordinate, editPlaceText, findListCity, selectListCity,
+} from '../utils/birthPlace';
 
 // Общият модул за място на раждане. Ползва се в „Профили“ и в „Генерирай хороскоп“
 // (за човека и за партньора). Състоянието е при родителя (виж emptyPlace в utils/birthPlace):
@@ -51,6 +53,9 @@ export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label =
   const latest = useRef(value);
   latest.current = value;
 
+  // Всяка промяна (избор, текст) и всяко търсене получават пореден номер: отговор със стар номер не променя нищо (R07)
+  const sequence = useRef(0);
+
   // Отговор, който идва, след като модулът е затворен (напр. при смяна на профил), се игнорира
   const alive = useRef(true);
   useEffect(() => {
@@ -63,26 +68,29 @@ export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label =
 
   const handleSelect = (e) => {
     const next = e.target.value;
+    sequence.current += 1;
     setStatus(null);
     setChoices([]);
     if (next === OTHER) {
       // Координатите на предишния град не бива да останат за ново място
-      onChange({ mode: 'other', city: '', country: '', lat: '', lon: '' });
+      onChange({ mode: 'other', city: '', country: '', lat: '', lon: '', meta: null });
       return;
     }
     const city = findListCity(next);
     if (city) {
-      onChange({ mode: 'list', city: city.name, country: '', lat: String(city.lat), lon: String(city.lon) });
+      onChange(selectListCity(city));
     } else {
       // „Изберете град...“: запазваме въведените координати
       onChange({ ...value, mode: 'list', city: '' });
     }
   };
 
+  // Промяна на града или държавата обезсилва избраната точка: координатите, проверката и идентификаторът не важат за новия текст
   const handleText = (field) => (e) => {
+    sequence.current += 1;
     setStatus(null);
     setChoices([]);
-    onChange({ ...value, [field]: e.target.value });
+    onChange(editPlaceText(value, field, e.target.value));
   };
 
   // Enter в полетата за град и държава търси координатите, а не изпраща цялата форма
@@ -95,21 +103,23 @@ export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label =
   const search = async () => {
     const city = value.city.trim();
     const country = value.country.trim();
+    sequence.current += 1;
+    const mine = sequence.current;
     setSearching(true);
     setStatus(null);
     setChoices([]);
     try {
       const found = await geocodePlace(city, country);
-      if (!alive.current) return;
+      if (!alive.current || mine !== sequence.current) return;       // променено или ново търсене: този отговор е остарял
       const current = latest.current;
       // Полетата са променени по време на търсенето: резултатът не важи за новия текст
       if (current.mode !== 'other' || current.city.trim() !== city || current.country.trim() !== country) return;
+      onChange(applyGeocodeResult(current, found));
       if (found.status === 'ambiguous') {
         setChoices(found.candidates || []);
         setStatus({ tone: 'warn', text: found.message || 'Има няколко места с това име. Изберете вашето.' });
         return;
       }
-      onChange({ ...current, lat: String(found.lat), lon: String(found.lon) });
       const name = [found.city, found.country].filter(Boolean).join(', ');
       setStatus(found.verified
         ? {
@@ -118,21 +128,25 @@ export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label =
         }
         : {
           tone: 'warn',
-          text: `Непроверено: ${name} (${found.lat}, ${found.lon}). Мястото го няма в проверената база (под 15 000 жители), а координатите са от AI. Проверете ги и ги коригирайте.`,
+          text: `Непроверено: ${name} (${found.lat}, ${found.lon}). Мястото го няма в проверената база (под 15 000 жители), а координатите са от AI. Потвърдете ги или ги коригирайте ръчно: без потвърждение анализът не тръгва.`,
+          confirm: true,
         });
     } catch (err) {
-      if (alive.current) {
+      if (alive.current && mine === sequence.current) {
+        // Грешка: никаква стара проверена точка не остава за този текст
+        onChange(applyGeocodeResult(latest.current, null));
         setStatus({ tone: 'error', text: apiErrorMessage(err, 'Не успяхме да намерим координатите. Въведете ги ръчно.') });
       }
     } finally {
-      if (alive.current) setSearching(false);
+      if (alive.current && mine === sequence.current) setSearching(false);
     }
   };
 
   // Избор между няколко места със същото име
   const choose = (place) => {
     const current = latest.current;
-    onChange({ ...current, lat: String(place.lat), lon: String(place.lon) });
+    sequence.current += 1;
+    onChange(choosePlace(current, place));
     setChoices([]);
     setStatus({
       tone: 'ok',
@@ -198,6 +212,18 @@ export const BirthPlaceSelect = ({ value, onChange, variant = 'profile', label =
               {status.text}
             </p>
           )}
+          {status?.confirm && !value.meta?.confirmed && (
+            <button
+              type="button"
+              onClick={() => { onChange(confirmAiPlace(latest.current)); setStatus({ tone: 'ok', text: 'Координатите са потвърдени от вас (предложени от AI, непроверени по GeoNames).' }); }}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors ${style.button}`}
+            >
+              Потвърждавам тези координати
+            </button>
+          )}
+          {value.meta?.source === 'manual' && (
+            <p className={style.hint}>Координатите са въведени ръчно и не са проверени по GeoNames.</p>
+          )}
           {choices.length > 0 && (
             <ul className="space-y-1" aria-label="Места със същото име">
               {choices.map((place) => (
@@ -230,7 +256,7 @@ export const BirthCoordinates = ({ value, onChange, variant = 'profile', require
         type="number"
         name={names[key]}
         value={value[key]}
-        onChange={(e) => onChange({ ...value, [key]: e.target.value })}
+        onChange={(e) => onChange(editCoordinate(value, key, e.target.value))}
         required={required}
         step="any"
         min={min}

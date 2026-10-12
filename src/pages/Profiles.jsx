@@ -109,12 +109,21 @@ const Profiles = () => {
     }
   };
 
+  // Основният профил е един (is_primary): новият профил е „Друг“ (или с избрана група), не втори „Аз“ (R08)
+  const hasOwner = profiles.some((p) => p.is_primary);
+
+  useEffect(() => {
+    if (hasOwner && !editingId) {
+      setForm((prev) => (prev.name === '' && prev.relation === 'self' ? { ...prev, relation: 'other' } : prev));
+    }
+  }, [hasOwner, editingId]);
+
   const resetForm = () => {
     setEditingId(null);
     setSaveError('');
     setForm({
       name: '',
-      relation: 'self',
+      relation: hasOwner ? 'other' : 'self',
       gender: 'unknown',
       birth_date: '',
       birth_time: '',
@@ -144,8 +153,9 @@ const Profiles = () => {
       lat: coords.lat,
       lon: coords.lon,
       settings: (() => {
-        const { birthFold: _old, ...rest } = existing?.settings || {};
-        return form.unknown_time || birthFold === null ? rest : { ...rest, birthFold };
+        const { birthFold: _old, placeMeta: _oldMeta, ...rest } = existing?.settings || {};
+        const withMeta = place.meta ? { ...rest, placeMeta: place.meta } : rest;        // GeoNames идентификатор, зона и източник с координатите
+        return form.unknown_time || birthFold === null ? withMeta : { ...withMeta, birthFold };
       })(),
     };
     setSaving(true);
