@@ -75,3 +75,35 @@ export const waitText = (seconds) => {
   const minutes = Math.max(1, Math.ceil((Number(seconds) || 0) / 60));
   return `след около ${minutes} ${minutes === 1 ? 'минута' : 'минути'}`;
 };
+
+// Входните данни на стартирана задача (цялата форма) се пазат в браузъра, за да върне „Нов опит“ същите данни, а не празната или
+// текущата форма (R08). Последните 10 задачи; свободният текст на въпроса остава само на това устройство.
+const inputsKey = (userId, jobId) => `astro_job_inputs_${userId}_${jobId}`;
+const inputsIndexKey = (userId) => `astro_job_inputs_index_${userId}`;
+const MAX_REMEMBERED_INPUTS = 10;
+
+export const rememberInputs = (userId, jobId, snapshot) => {
+  try {
+    localStorage.setItem(inputsKey(userId, jobId), JSON.stringify(snapshot));
+    const index = JSON.parse(localStorage.getItem(inputsIndexKey(userId)) || '[]').filter((id) => id !== jobId);
+    index.push(jobId);
+    while (index.length > MAX_REMEMBERED_INPUTS) localStorage.removeItem(inputsKey(userId, index.shift()));
+    localStorage.setItem(inputsIndexKey(userId), JSON.stringify(index));
+  } catch {
+    // без localStorage „Нов опит“ отваря генератора без попълнени данни
+  }
+};
+
+export const recallInputs = (userId, jobId) => {
+  try {
+    const value = localStorage.getItem(inputsKey(userId, jobId));
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+};
+
+// Скорошна успешна задача, която екранът не показва: линк „Отвори в История“ от генератора (не само от История)
+export const recentFinishedJob = (jobs, now = Date.now(), maxAgeMs = 6 * 60 * 60 * 1000) =>
+  (jobs || []).find((j) => j.status === 'succeeded' && j.report_id && now - new Date(`${j.created_at}Z`).getTime() < maxAgeMs) || null;
+

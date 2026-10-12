@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Sparkles, Calendar, Clock, MessageSquare, User, Users, TrendingUp, Activity, Infinity } from 'lucide-react';
 import AstroChart from '../components/AstroChart';
 import ReportText from '../components/ReportText';
@@ -11,12 +11,12 @@ import ForecastZone from '../components/ForecastZone';
 import { browserZone, nowInZone } from '../utils/forecastZone';
 import { emptyPlace, normalizePlace, placeBlocker, placeFromParts, placeFromProfile, placeLabel } from '../utils/birthPlace';
 import { clearSessionAndRedirect, verifySession } from '../utils/auth';
-import { api, apiErrorMessage, fetchProfiles, migrateLocalData, upsertProfile } from '../utils/api';
+import { api, apiErrorMessage, fetchProfiles, migrateLocalData, REPORT_TYPE_LABELS, upsertProfile } from '../utils/api';
 import { CONTEXT_OPTIONS, PARENT_OPTIONS, relationLabel, suggestContext, suggestParentRole } from '../utils/relations';
 import { accessLabel, availableFor, balanceOf, formatEur, periodMonths, quoteFor, withBalance } from '../utils/money';
 import {
-  STAGE_MESSAGES, STAGE_STEPS, cancelJob, createJob, fetchJob, fetchJobLimits, forgetJob, isActive, newKey,
-  recallJob, rememberJob, waitText,
+  STAGE_MESSAGES, STAGE_STEPS, cancelJob, createJob, fetchJob, fetchJobLimits, fetchJobs, forgetJob, isActive, newKey,
+  recallInputs, recallJob, recentFinishedJob, rememberInputs, rememberJob, waitText,
 } from '../utils/jobs';
 import DOMPurify from 'dompurify';
 
@@ -90,7 +90,9 @@ const knownGender = (profile, typedName) =>
 
 const GenerateReport = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
+  const [finishedLink, setFinishedLink] = useState(null);   // скорошна готова задача, която не е на екрана: линк към История
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -136,6 +138,7 @@ const GenerateReport = () => {
   const [partnerState, setPartnerState] = useState({ blocking: false, zone: '' });
   // Отношения между двамата: null = още не е избрано (важи предложението по групата на профила), '' = общо взаимодействие
   const [relationship, setRelationship] = useState(null);
+  const [editBirth, setEditBirth] = useState(false);       // записан профил: рождените данни са скрити зад кратка справка, докато не се поискат за редакция
   const [parentRole, setParentRole] = useState(null);   // null = по предложението (ако има); '' = не уточнявам; 'user' | 'partner'
 
   const [loading, setLoading] = useState(false);
@@ -153,7 +156,10 @@ const GenerateReport = () => {
   const [jobLimits, setJobLimits] = useState(null);        // колко анализа остават и кога може нов опит
   const pollRef = useRef({ timer: null, jobId: null, seen: 0, months: [], failures: 0, stopped: true, startedAt: 0, payloadKey: null });
   const submitKeys = useRef(new Map());                    // ключ за идемпотентност за всяка различна заявка
-  const snapshotRef = useRef(null);                        // резултатът преди новия анализ: връща се при неуспех или отказ
+  const snapshotRef = useRef(null);                        // предишният резултат с неговите параметри: не се връща като резултат на нов анализ (R14)
+  const pendingMetaRef = useRef(null);                     // параметрите на стартираната задача (хора, режим, тема, дата)
+  const [resultMeta, setResultMeta] = useState(null);      // параметрите на показания резултат: НЕ са текущата форма
+  const [previousCard, setPreviousCard] = useState(null);  // предишен резултат след отказ на нов анализ: ясно означена карта с „Отвори“
 
   const updateBalance = (source) => {
     if (!source) return;
@@ -233,6 +239,28 @@ const GenerateReport = () => {
     };
   }, [user?.id]);
 
+  // „Нов опит“ от История: същите входни данни на неуспешната или отказаната задача, не празната форма (R08)
+  useEffect(() => {
+    const jobId = location.state?.restoreJobId;
+    if (!jobId || !user?.id) return;
+    const saved = recallInputs(user.id, jobId);
+    if (saved) {
+      restoreInputs(saved);
+      setNotice('Данните от предишния опит са възстановени. Прегледайте ги и стартирайте отново.');
+    } else {
+      setNotice('Данните от този опит не са запазени на това устройство. Попълнете формата отново.');
+    }
+    navigate(location.pathname, { replace: true, state: null });      // еднократно: обновяването не възстановява пак
+  }, [location.state, user?.id]);
+
+  // Скорошна готова задача, която не е на екрана: линк към отчета в История (не само оттам се отварят готовите анализи)
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let alive = true;
+    fetchJobs({ limit: 5 }).then((jobs) => { if (alive) setFinishedLink(recentFinishedJob(jobs)); }).catch(() => {});
+    return () => { alive = false; };
+  }, [user?.id, activeJob?.status]);
+
   // Когато ограничението изтече, опресняваме лимита, за да се отключи бутонът
   useEffect(() => {
     if (!jobLimits || jobLimits.can_start || !jobLimits.retry_after_seconds) return undefined;
@@ -256,7 +284,42 @@ const GenerateReport = () => {
   const forecastMaxEnd = maxEndDate(forecastStart, forecastMaxMonths);
   const forecastWho = enablePartner ? 'за двама души' : 'за един човек';
 
+  // Един избор вместо два независими превключвателя: натален | за дата | за период
+  const analysisMode = isDynamic ? 'period' : (enableTransit ? 'snapshot' : 'natal');
+  const changeAnalysisMode = (mode) => {
+    setIsDynamic(mode === 'period');
+    setEnableTransit(mode === 'snapshot');
+  };
+
   const emptyPartnerData = { partner_name: '', partner_date: '', partner_time: '' };
+
+  // Цялата форма като една стойност: за „Нов опит“ със същите входни данни (R08)
+  const collectInputs = () => ({
+    profileChoice, name, birthPlace, formData, unknownTime, birthFold, analysisMode, transitData, endDate, reportType, forecastZone,
+    enablePartner, partnerChoice, partnerData, partnerPlace, partnerUnknownTime, partnerFold, relationship, parentRole,
+  });
+  const restoreInputs = (saved) => {
+    if (!saved) return;
+    setProfileChoice(saved.profileChoice || '');
+    setName(saved.name || '');
+    setBirthPlace(normalizePlace(saved.birthPlace));
+    setFormData({ date: '', time: '', question: '', ...(saved.formData || {}) });
+    setUnknownTime(Boolean(saved.unknownTime));
+    setBirthFold(saved.birthFold ?? null);
+    changeAnalysisMode(saved.analysisMode || 'natal');
+    if (saved.transitData) { setTransitData(saved.transitData); setTargetTouched(true); }
+    setEndDate(saved.endDate || '');
+    setReportType(saved.reportType || 'general');
+    if (saved.forecastZone) setForecastZone(saved.forecastZone);
+    setEnablePartner(Boolean(saved.enablePartner));
+    setPartnerChoice(saved.partnerChoice || '');
+    setPartnerData({ ...emptyPartnerData, ...(saved.partnerData || {}) });
+    setPartnerPlace(normalizePlace(saved.partnerPlace));
+    setPartnerUnknownTime(Boolean(saved.partnerUnknownTime));
+    setPartnerFold(saved.partnerFold ?? null);
+    setRelationship(saved.relationship ?? null);
+    setParentRole(saved.parentRole ?? null);
+  };
 
   // Отношения между двамата: избраното от човека, иначе предложение по групата на втория профил (само когато първият е основният)
   const suggestedRelationship = suggestContext(selectedProfile, partnerProfile);
@@ -309,6 +372,7 @@ const GenerateReport = () => {
   // (въпрос, транзити, партньор) - от profile.settings
   const applyProfile = (profile) => {
     const settings = profile.settings || {};
+    setEditBirth(false);
     setProfileChoice(String(profile.id));
     setName(profile.name);
     setFormData({
@@ -321,8 +385,19 @@ const GenerateReport = () => {
     setRelationship(settings.relationship ?? null);
     setParentRole(settings.parentRole ?? null);
     setBirthPlace(placeFromProfile(profile));
-    setEnableTransit(Boolean(settings.enableTransit));
-    if (settings.transitData) setTransitData(settings.transitData);
+    // Стратегия при смяна на профил (R08): възстановява се ЦЕЛИЯТ запазен контекст на последния анализ за него (режим, дати, тема,
+    // въпрос, втори човек), но само ако е още валиден; иначе формата е натален анализ. Не се смесват стар въпрос или дата с друг режим.
+    const savedMode = settings.mode ?? (settings.enableTransit ? 'snapshot' : 'natal');
+    const today = nowInZone(forecastZone).date;
+    const periodValid = Boolean(settings.endDate && settings.endDate >= today && settings.transitData?.target_date);
+    const mode = savedMode === 'period' && !periodValid ? 'natal' : savedMode;
+    changeAnalysisMode(mode);
+    if (mode !== 'natal' && settings.transitData) {
+      setTransitData(settings.transitData);
+      setTargetTouched(true);
+    }
+    setEndDate(mode === 'period' ? settings.endDate : '');
+    setReportType(settings.reportType || 'general');
     setEnablePartner(Boolean(settings.enablePartner));
     restorePartner(settings);
   };
@@ -379,6 +454,9 @@ const GenerateReport = () => {
       question: formData.question || '',
       transitData,
       enableTransit,
+      mode: analysisMode,
+      endDate,
+      reportType,
       partnerData,
       partnerPlace,
       enablePartner,
@@ -534,11 +612,19 @@ const GenerateReport = () => {
     if (pollRef.current.payloadKey) submitKeys.current.delete(pollRef.current.payloadKey);
     if (job.balance) updateBalance(job.balance);
     // Неуспех или отказ: последният резултат остава на екрана; без него не оставяме недовършени месеци
+    // R14: старият резултат НЕ се връща под формата на новия анализ. Слотът на новия е „неуспешен“ (грешката горе), а предишният
+    // отчет остава в отделна карта с неговите хора, режим, тема и дата и бутон „Отвори“.
     const restorePrevious = () => {
       const previous = snapshotRef.current;
-      setMonthlyResults(previous ? previous.monthlyResults : []);
-      setResult(previous ? previous.result : (prev) => (prev ? { ...prev, interpretation: '' } : prev));
+      setMonthlyResults([]);
+      setResult((prev) => (prev ? { ...prev, interpretation: '' } : prev));
+      setResultMeta(null);
+      setPreviousCard(previous && previous.result?.interpretation ? previous : null);
     };
+    if (job.status === 'succeeded') {
+      setResultMeta(pendingMetaRef.current);        // резултатът е със собствените си параметри, не с тези на формата след това
+      setPreviousCard(null);
+    }
     if (job.status === 'failed') {
       setError(job.error?.message || 'Анализът не успя. Сумата е върната.');
       restorePrevious();
@@ -661,7 +747,7 @@ const GenerateReport = () => {
     setNeedsBalance(false);
     setNotice('');
     setCrisisHtml('');        // последният резултат остава на екрана, докато новият анализ не стартира
-    snapshotRef.current = { result, monthlyResults };
+    snapshotRef.current = { result, monthlyResults, meta: resultMeta };
 
     let attached = false;     // докато задачата работи, екранът остава в състояние на изчакване
     try {
@@ -771,7 +857,23 @@ const GenerateReport = () => {
       }
 
       // Създаваме задача: генерацията върви на сървъра, а екранът я следи (виж attachToJob)
+      pendingMetaRef.current = {
+        people: [requestData.name, requestData.partner_name].filter(Boolean).join(' и ') || 'Без име',
+        mode: requestData.is_dynamic ? 'За период' : (requestData.target_date ? 'За дата' : 'Натален'),
+        theme: REPORT_TYPE_LABELS[reportType] || 'Анализ',
+        when: requestData.is_dynamic ? `${formatBgDate(requestData.target_date)} – ${formatBgDate(requestData.end_date)}`
+          : (requestData.target_date ? `${formatBgDate(requestData.target_date)} ${requestData.target_time || ''}`.trim() : ''),
+      };
       attached = Boolean(await startJob(requestData));
+      if (attached) {
+        const startedJob = pollRef.current.jobId;
+        if (startedJob && user?.id) rememberInputs(user.id, startedJob, collectInputs());
+        // Новият слот за резултат е „в процес“: резултатът на предишния анализ не остава под формата на този
+        setResult(null);
+        setMonthlyResults([]);
+        setResultMeta(null);
+        setPreviousCard(null);
+      }
 
       // Запомняме настройките към профила (или запазваме нов профил) на сървъра
       persistProfile({ lat, lon });
@@ -1035,6 +1137,21 @@ const GenerateReport = () => {
                   </p>
                 </div>
 
+                {/* Записан профил: кратка справка за раждането с „Промени“ на място; без втори прозорец (R08) */}
+                {selectedProfile && !editBirth && (
+                  <div className="rounded-lg border border-slate-600/50 bg-slate-800/40 px-4 py-3" data-testid="birth-summary">
+                    <p className="text-sm text-gray-200">
+                      <b>{selectedProfile.name}</b>
+                      {' · '}{formatBgDate(formData.date)}{unknownTime ? ' · часът е неизвестен' : (formData.time ? `, ${formData.time}` : '')}
+                      {placeLabel(birthPlace) ? ` · ${placeLabel(birthPlace)}` : ''}
+                    </p>
+                    <button type="button" onClick={() => setEditBirth(true)} className="mt-1 text-xs underline text-purple-300 hover:text-purple-200">
+                      Промени данните за този анализ
+                    </button>
+                  </div>
+                )}
+                {(!selectedProfile || editBirth) && (
+                  <>
                 {/* Birth place: град от списъка или „Друг“ (търсене с AI или ръчно) */}
                 <BirthPlaceSelect key={`person-${profileChoice}`} value={birthPlace} onChange={changeBirthPlace} variant="purple" label="Град на раждане" />
 
@@ -1074,6 +1191,9 @@ const GenerateReport = () => {
                   </div>
                 </div>
 
+                  </>
+                )}
+
                 <BirthMoment
                   date={formData.date}
                   time={formData.time}
@@ -1088,35 +1208,51 @@ const GenerateReport = () => {
                 />
 
                 {/* Ширина и дължина: попълват се от града или от AI и могат да се коригират */}
-                <BirthCoordinates
-                  value={birthPlace}
-                  onChange={changeBirthPlace}
-                  variant="purple"
-                  required
-                  names={{ lat: 'lat', lon: 'lon' }}
-                />
+                {(!selectedProfile || editBirth) && (
+                  <BirthCoordinates
+                    value={birthPlace}
+                    onChange={changeBirthPlace}
+                    variant="purple"
+                    required
+                    names={{ lat: 'lat', lon: 'lon' }}
+                  />
+                )}
+
+                {/* Видът на анализа: три взаимно изключващи се избора (R08): натален, за дата, за период */}
+                <fieldset className="rounded-lg border border-slate-600/50 p-3" data-testid="analysis-mode">
+                  <legend className="px-2 text-sm font-medium text-gray-300">Вид на анализа</legend>
+                  <div role="radiogroup" aria-label="Вид на анализа" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      ['natal', 'Натален', 'Какво показва наталната карта'],
+                      ['snapshot', 'За дата', 'Транзити за конкретна дата и час'],
+                      ['period', 'За период', 'Месец по месец с точен календар'],
+                    ].map(([value, label, hint]) => (
+                      <label
+                        key={value}
+                        className={`cursor-pointer rounded-lg border px-3 py-2 text-sm transition-colors ${analysisMode === value ? 'border-purple-400 bg-purple-600/20 text-white' : 'border-slate-600/60 text-gray-300 hover:bg-white/5'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="analysis-mode"
+                          value={value}
+                          checked={analysisMode === value}
+                          onChange={() => changeAnalysisMode(value)}
+                          className="sr-only"
+                        />
+                        <span className="block font-medium">{label}</span>
+                        <span className="block text-xs text-gray-400">{hint}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
 
                 {/* Dynamic Forecast Mode Section */}
-                <div className="border-t border-blue-800/30 pt-4 bg-blue-950/10 rounded-lg p-4 border-2 border-blue-800/20">
+                <div className={`border-t border-blue-800/30 pt-4 bg-blue-950/10 rounded-lg p-4 border-2 border-blue-800/20 ${isDynamic ? '' : 'hidden'}`}>
                   <div className="flex items-center gap-2 mb-2">
-                    <input
-                      type="checkbox"
-                      id="isDynamic"
-                      checked={isDynamic}
-                      onChange={(e) => {
-                        setIsDynamic(e.target.checked);
-                        if (e.target.checked) {
-                          setEnableTransit(false); // Деактивиране на стандартния транзитен режим
-                        }
-                      }}
-                      className="w-4 h-4 rounded bg-slate-700/50 border-blue-800/30 text-blue-600 focus:ring-blue-500"
-                    />
-                    <label htmlFor="isDynamic" className="text-sm font-medium text-gray-300 flex items-center gap-2 cursor-pointer">
-                      <Calendar className="w-4 h-4 text-blue-400" />
-                      📅 Динамична Прогноза (Период)
-                    </label>
+                    <Calendar className="w-4 h-4 text-blue-400" />
+                    <h3 className="text-sm font-medium text-gray-300">Прогноза за период</h3>
                   </div>
-                  <p className="text-xs text-gray-400 italic mb-4 ml-6">
+                  <p className="text-xs text-gray-400 italic mb-4">
                     Генерира месечен анализ за избран период с конкретни транзити и събития за всеки месец.
                   </p>
                   
@@ -1162,23 +1298,14 @@ const GenerateReport = () => {
                 </div>
 
                 {/* Forecast Date Section (Standard Transit Mode) */}
-                {!isDynamic && (
+                {!isDynamic && enableTransit && (
                   <div className="border-t border-purple-800/30 pt-4 bg-purple-950/10 rounded-lg p-4 border-2 border-purple-800/20">
                     <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        id="enableTransit"
-                        checked={enableTransit}
-                        onChange={(e) => setEnableTransit(e.target.checked)}
-                        className="w-4 h-4 rounded bg-slate-700/50 border-purple-800/30 text-purple-600 focus:ring-purple-500"
-                      />
-                      <label htmlFor="enableTransit" className="text-sm font-medium text-gray-300 flex items-center gap-2 cursor-pointer">
-                        <TrendingUp className="w-4 h-4 text-purple-400" />
-                        Анализ на транзити (прогнозна дата)
-                      </label>
+                      <TrendingUp className="w-4 h-4 text-purple-400" />
+                      <h3 className="text-sm font-medium text-gray-300">Анализ за дата</h3>
                     </div>
-                    <p className="text-xs text-gray-400 italic mb-4 ml-6">
-                      Анализира транзитите към наталната карта за конкретна дата и час (моментен snapshot).
+                    <p className="text-xs text-gray-400 italic mb-4">
+                      Анализира транзитите към наталната карта за конкретна дата и час (моментен анализ).
                     </p>
 
                     {enableTransit && (
@@ -1628,11 +1755,51 @@ const GenerateReport = () => {
               AI Интерпретация
             </h2>
             
+            {finishedLink && !loading && !result && (
+              <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3" data-testid="finished-link">
+                <p className="text-sm text-emerald-100">Имате готов анализ, който не е на екрана.</p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/history', { state: { openReportId: finishedLink.report_id } })}
+                  className="mt-2 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                >
+                  Отвори в История
+                </button>
+              </div>
+            )}
+
+            {previousCard && !loading && (
+              <div className="mb-4 rounded-lg border border-slate-600/60 bg-slate-800/50 px-4 py-3" data-testid="previous-card">
+                <p className="text-xs uppercase tracking-wide text-slate-400">Предишен резултат (не е за този опит)</p>
+                <p className="mt-1 text-sm text-slate-200">
+                  {[previousCard.meta?.people, previousCard.meta?.mode, previousCard.meta?.theme, previousCard.meta?.when].filter(Boolean).join(' · ') || 'Предишен анализ'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResult(previousCard.result);
+                    setMonthlyResults(previousCard.monthlyResults || []);
+                    setResultMeta(previousCard.meta || null);
+                    setPreviousCard(null);
+                  }}
+                  className="mt-2 rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
+                >
+                  Отвори
+                </button>
+              </div>
+            )}
+
             {loading && (
               <div className="flex flex-col items-center justify-center h-64 space-y-4">
                 <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
                 <p className="text-gray-400">AI анализира картата...</p>
               </div>
+            )}
+
+            {!loading && resultMeta && result && result.interpretation && (
+              <p className="mb-3 text-xs text-slate-400" data-testid="result-meta">
+                Резултат за: {[resultMeta.people, resultMeta.mode, resultMeta.theme, resultMeta.when].filter(Boolean).join(' · ')}
+              </p>
             )}
 
             {!loading && !result && (

@@ -1,5 +1,5 @@
-import React from 'react';
-import { polarToCartesian } from '../utils/astroMath';
+import React, { useState } from 'react';
+import { formatLongitude, polarToCartesian } from '../utils/astroMath';
 
 // Символи за зодиакалните знаци
 const ZODIAC_SIGNS = [
@@ -40,12 +40,9 @@ const SIGN_BG = {
 
 // Подсказка за планета: знак, градус и минута, дом и посока на движение (не само абсолютните градуси)
 export const planetTip = (name, longitude, house, speed) => {
-  const lon = ((longitude % 360) + 360) % 360;
-  const sign = SIGN_BG[ZODIAC_SIGNS[Math.floor(lon / 30)].name];
-  const inSign = lon % 30;
-  const deg = Math.floor(inSign);
-  const min = Math.min(59, Math.floor((inSign - deg) * 60));
-  const parts = [`${name}: ${sign} ${deg}°${String(min).padStart(2, '0')}′`];
+  const position = formatLongitude(longitude);       // същото правило като в обобщението и в текста (закръглени минути)
+  const sign = SIGN_BG[ZODIAC_SIGNS[position.signIndex].name];
+  const parts = [`${name}: ${sign} ${position.text}`];
   if (house) parts.push(`${house}-ти дом`);
   if (typeof speed === 'number') parts.push(speed < 0 ? 'ретрограден' : 'директен');
   return parts.join(' · ');
@@ -118,6 +115,8 @@ export const spreadLongitudes = (longitudes, minGap = MIN_GAP) => {
 };
 
 export default function AstroChart({ data }) {
+  // Избрана планета (с клавиатура, докосване или щракване): подсказката не зависи само от посочване с мишка
+  const [activePlanet, setActivePlanet] = useState(null);
   if (!data || !data.planets || !data.houses) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400">
@@ -192,12 +191,25 @@ export default function AstroChart({ data }) {
       const tickFrom = polarToCartesian(centerX, centerY, innerRadius, longitude);
       const tickTo = polarToCartesian(centerX, centerY, innerRadius + 12, longitude);
       const degreePos = polarToCartesian(centerX, centerY, planetRadius - 36, shownAt);
-      const degree = `${Math.floor(longitude % 30)}°${planetData.speed < 0 ? '℞' : ''}`;
+      const degree = `${formatLongitude(longitude).deg}°${planetData.speed < 0 ? '℞' : ''}`;
       const symbol = PLANET_SYMBOLS[planetName] || '•';
       const name = PLANET_NAMES[planetName] || planetName;
 
+      const tip = planetTip(name, longitude, planetData.house, planetData.speed);
+      const active = activePlanet === planetName;
+      const choose = () => setActivePlanet(planetName);
       return (
-        <g key={planetName}>
+        <g
+          key={planetName}
+          tabIndex={0}
+          role="button"
+          aria-label={tip}
+          aria-pressed={active}
+          onFocus={choose}
+          onClick={choose}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } if (e.key === 'Escape') setActivePlanet(null); }}
+          style={{ cursor: 'pointer', outline: 'none' }}
+        >
           <line x1={tickFrom.x} y1={tickFrom.y} x2={tickTo.x} y2={tickTo.y} stroke="#FBBF24" strokeWidth="2" />
           <text x={degreePos.x} y={degreePos.y} textAnchor="middle" dominantBaseline="middle"
             className="fill-slate-300 text-xs pointer-events-none">{degree}</text>
@@ -206,8 +218,8 @@ export default function AstroChart({ data }) {
             cy={pos.y}
             r="17"
             fill="#1A202C"
-            stroke="#4A5568"
-            strokeWidth="1.5"
+            stroke={active ? '#FBBF24' : '#4A5568'}
+            strokeWidth={active ? 3 : 1.5}
             className="hover:stroke-blue-400 transition-colors"
           />
           <text
@@ -219,7 +231,7 @@ export default function AstroChart({ data }) {
           >
             {symbol}
           </text>
-          <title>{planetTip(name, longitude, planetData.house, planetData.speed)}</title>
+          <title>{tip}</title>
         </g>
       );
     });
@@ -357,7 +369,17 @@ export default function AstroChart({ data }) {
       </svg>
       <p className="text-xs text-slate-400 mt-2 max-w-xl text-center">
         Символите на планетите са леко раздалечени, за да се четат. Жълтата чертичка на вътрешния пръстен е точната позиция.
-        Посочете планета за знак, градус, дом и посока на движение.
+        Посочете, докоснете или изберете с клавиатурата (Tab, Enter) планета за знак, градус, дом и посока на движение.
+      </p>
+      <p
+        className="mt-2 min-h-[1.5rem] text-sm text-slate-200 text-center"
+        role="status"
+        aria-live="polite"
+        data-testid="planet-tip"
+      >
+        {activePlanet && data.planets?.[activePlanet]?.longitude != null
+          ? planetTip(PLANET_NAMES[activePlanet] || activePlanet, data.planets[activePlanet].longitude, data.planets[activePlanet].house, data.planets[activePlanet].speed)
+          : ''}
       </p>
       {data.time_known === false && (
         <p className="sr-only">Часът на раждане е неизвестен: колелото е без домове, Асцендент и MC и без Луна.</p>

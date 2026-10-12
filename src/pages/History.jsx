@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ReportText from '../components/ReportText';
 import ReportExport from '../components/ReportExport';
+import { filterGroups, filterItems, profileOptions } from '../utils/historyFilters';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
 import { api, deleteReport, fetchReport, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 import { accessLabel, balanceOf, formatEur } from '../utils/money';
@@ -9,6 +10,7 @@ import { fetchJobs, isActive, rememberJob } from '../utils/jobs';
 
 export default function History() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -22,6 +24,7 @@ export default function History() {
   const [viewLoading, setViewLoading] = useState(false);
   const [viewMode, setViewMode] = useState('table');
   const [timeline, setTimeline] = useState(null);
+  const [timelineError, setTimelineError] = useState('');
   const [jobs, setJobs] = useState([]);   // анализи в процес и неуспешни от последното денонощие (Фаза 11)
 
   const loadJobs = async () => {
@@ -35,7 +38,7 @@ export default function History() {
   const loadReports = async () => {
     try {
       await migrateLocalData();
-      const items = await fetchReports();
+      const items = await fetchReports(500);
       setHistory(items.map((r) => ({ ...r, date: formatDate(r.created_at) })));
     } catch (err) {
       console.error('Грешка при зареждане на историята:', err);
@@ -93,6 +96,15 @@ export default function History() {
     return () => clearInterval(timer);
   }, [user, hasActiveJob]);
 
+  // Линк от генератора („Отвори в История“): отваря готовия отчет веднъж
+  useEffect(() => {
+    const id = location.state?.openReportId;
+    if (!id || history.length === 0) return;
+    const item = history.find((r) => r.id === id);
+    if (item) openReport({ ...item, date: formatDate(item.created_at) });
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, history.length]);
+
   // Втори ред за отчет: вид анализ (натален, за дата, за период), моментът или периодът и вторият човек
   const MODE_LABELS = { natal: 'Натален', snapshot: 'За дата', period: 'За период' };
   const modeLine = (r) => [MODE_LABELS[r.mode], r.when, r.partner ? `с ${r.partner}` : ''].filter(Boolean).join(' · ');
@@ -108,16 +120,23 @@ export default function History() {
   };
   const openGenerator = (j) => {
     if (isActive(j) && user) rememberJob(user.id, j.id);
-    navigate('/generate-report');
+    // „Нов опит“ носи номера на задачата: генераторът възстановява нейните входни данни
+    navigate('/generate-report', isActive(j) ? undefined : { state: { restoreJobId: j.id } });
   };
 
+  // Времевата линия се зарежда веднъж (без филтри) и се филтрира с ТОВА ПРАВИЛО, с което се филтрира и таблицата (utils/historyFilters):
+  // така една комбинация тема + профил + текст дава еднакво множество отчети в двата изгледа. Грешката не е „няма отчети“.
   useEffect(() => {
     if (viewMode !== 'timeline' || !user) return;
     setTimeline(null);
-    api.get('/timeline', { params: filterProfile !== 'all' ? { profile: filterProfile } : {} })
+    setTimelineError('');
+    api.get('/timeline')
       .then((r) => setTimeline(r.data))
-      .catch(() => setTimeline({ groups: [], profiles: [] }));
-  }, [viewMode, filterProfile, user, history.length]);
+      .catch(() => setTimelineError('Времевата линия не можа да се зареди. Опитайте отново.'));
+  }, [viewMode, user, history.length]);
+
+  // Смяна на филтър: връщане на първа страница
+  useEffect(() => { setCurrentPage(1); }, [filterType, filterProfile, searchQuery]);
 
   const typeIcons = {
     general: 'auto_awesome', health: 'favorite_border', career: 'work',
@@ -129,20 +148,14 @@ export default function History() {
   };
   const typeLabels = REPORT_TYPE_LABELS;
 
-  const filteredHistory = history.filter(item => {
-    if (filterType !== 'all' && item.type !== filterType) return false;
-    if (filterProfile !== 'all' && item.profile !== filterProfile) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      if (!item.label.toLowerCase().includes(q) && !item.profile.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
+  const filters = { type: filterType, profile: filterProfile, query: searchQuery };
+  const filteredHistory = filterItems(history, filters);
+  const timelineGroups = timeline ? filterGroups(timeline.groups, filters) : [];
 
   const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
   const paginatedHistory = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const profileOptions = ['all', ...new Set(history.map(h => h.profile))];
+  const profileChoices = profileOptions(history);
 
   if (!user) return null;
 
@@ -447,8 +460,9 @@ export default function History() {
               onChange={(e) => setFilterProfile(e.target.value)}
               className="bg-[#201428] border border-[#302240] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#7c5dfa]"
             >
-              {profileOptions.map(opt => (
-                <option key={opt} value={opt}>{opt === 'all' ? 'Всички профили' : opt}</option>
+              <option value="all">Всички профили</option>
+              {profileChoices.map((opt) => (
+                <option key={opt.key} value={opt.key}>{opt.label}</option>
               ))}
             </select>
             <button
@@ -475,15 +489,19 @@ export default function History() {
           {viewMode === 'timeline' ? (
             <div className="relative pl-6">
               <div className="absolute left-2 top-1 bottom-1 w-px bg-[#302240]" />
-              {!timeline ? (
+              {timelineError ? (
+                <p className="text-sm text-red-300" role="alert">{timelineError}</p>
+              ) : !timeline ? (
                 <p className="text-sm text-[#d4c8ed]">Зареждане…</p>
-              ) : timeline.groups.length === 0 ? (
-                <p className="text-sm text-[#d4c8ed]">Още няма отчети за времевата линия.</p>
-              ) : timeline.groups.map((g) => (
+              ) : timelineGroups.length === 0 ? (
+                <p className="text-sm text-[#d4c8ed]">
+                  {timeline.groups.length === 0 ? 'Още няма отчети за времевата линия.' : 'Няма отчети за избраните филтри.'}
+                </p>
+              ) : timelineGroups.map((g) => (
                 <div key={g.month} className="mb-8">
                   <div className="flex items-center gap-2 mb-3 -ml-6">
                     <span className="w-4 h-4 rounded-full bg-[#7c5dfa] border-4 border-[#161022]" />
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">{g.label}</h3>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">{g.label} <span className="font-normal text-[#b8aed0]">· {g.reports.length}</span></h3>
                   </div>
                   <div className="space-y-2">
                     {g.reports.map((r) => (

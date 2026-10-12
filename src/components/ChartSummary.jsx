@@ -1,3 +1,4 @@
+import { formatLongitude } from '../utils/astroMath';
 import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
 
@@ -273,9 +274,8 @@ function _getPlanetHouse(longitude, houses) {
  * Помощна функция за форматиране на ъгъл
  */
 function _formatAngle(angle) {
-  const degrees = Math.floor(angle);
-  const minutes = Math.floor((angle - degrees) * 60);
-  return `${degrees}°${minutes.toString().padStart(2, '0')}'`;
+  const position = formatLongitude(angle);          // една функция за всички екрани: закръглени минути, без преминаване на границата на знака
+  return `${position.deg}°${String(position.min).padStart(2, '0')}'`;
 }
 
 /**

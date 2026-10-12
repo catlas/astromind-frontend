@@ -43,6 +43,28 @@ export function degreesToRadians(degrees) {
   return degrees * Math.PI / 180;
 }
 
-
-
+/**
+ * Позицията в зодиака като една стойност за всички екрани (колело, подсказки, обобщение, пример): знак, градуси и минути.
+ * Правилото е като на сървъра (engine.decimal_to_dms): минутите се закръгляват; 29°59'30" и нагоре остава в същия знак (без
+ * преминаване в следващия), за да не се смени знакът заради закръгляне.
+ *
+ * @param {number} longitude - Дължина в градуси
+ * @returns {{signIndex: number, deg: number, min: number, text: string}}
+ */
+export function formatLongitude(longitude) {
+  const lon = ((Number(longitude) % 360) + 360) % 360;
+  const signIndex = Math.floor(lon / 30);
+  const inSign = lon % 30;
+  let deg = Math.floor(inSign);
+  let min = Math.round((inSign - deg) * 60);
+  if (min >= 60) {
+    if (deg + 1 >= 30) {
+      min = 59;
+    } else {
+      min = 0;
+      deg += 1;
+    }
+  }
+  return { signIndex, deg, min, text: `${deg}°${String(min).padStart(2, '0')}′` };
+}
 
