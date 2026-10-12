@@ -45,6 +45,11 @@ API-то (`astromind-api`) слага заглавията само (виж `bac
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=()` |
 
+Проверка на живия сайт (само чете): `python3 scripts/check_headers.py https://astromind-web.onrender.com/`; излиза с код 1, ако
+липсва `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Referrer-Policy` или `nosniff`. До настройването на заглавията от
+собственика сайтът има временна защита: `<meta name="referrer">` и `public/frame-guard.js` (скрива страницата, ако е вградена в
+чужд документ). Те не заместват заглавията.
+
 Заглавие `Content-Security-Policy` от хостинга се комбинира със строгото `<meta>`: важи по-ограничителното. Проверка след
 промяна: `curl -sI https://astromind-web.onrender.com/ | grep -i "strict-transport\|x-frame\|content-security"`.
 

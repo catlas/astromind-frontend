@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { verifySession } from '../utils/auth';
 import { api, apiErrorMessage, formatDate } from '../utils/api';
-import { FALLBACK_PRICES, balanceOf, formatEur, formatSignedEur, giftOf, paidOf } from '../utils/money';
+import { FALLBACK_PRICES, balanceOf, formatEur, formatSignedEur, giftOf, paidOf, partnerSurchargeText } from '../utils/money';
+import { billingSteps } from '../utils/howItWorks';
+import HowItWorks from '../components/HowItWorks';
 
 const REASON_LABELS = {
   signup_gift: 'Подарък при регистрация',
@@ -175,6 +177,12 @@ const Balance = () => {
           </div>
         )}
 
+        {config && (
+          <div className="max-w-5xl mx-auto">
+            <HowItWorks compact title="Как работи балансът" steps={billingSteps({ enforced, gift: signupGift, prices })} />
+          </div>
+        )}
+
         <section className="max-w-3xl mx-auto mb-14 bg-[#1f1c27] rounded-3xl border border-white/10 p-8">
           <p className="text-sm font-medium uppercase tracking-wider text-slate-400 mb-2">Наличен баланс</p>
           <p className="text-5xl font-extrabold tracking-tight mb-6">{formatEur(balanceOf(user))}</p>
@@ -219,7 +227,7 @@ const Balance = () => {
                     Подробен анализ за всеки календарен месец от периода, с общ преглед{limitsNote}
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
-                    За двама души: още {formatEur(prices.forecast_partner_extra)} към цената на прогнозата. Плаща се само от внесени средства.
+                    За двама души: {partnerSurchargeText(prices)} (еднократно, не на месец). Плаща се само от внесени средства.
                   </p>
                 </div>
                 <p className="text-xl font-bold whitespace-nowrap">{formatEur(prices.forecast_month)}<span className="text-sm font-normal text-slate-400"> / месец</span></p>

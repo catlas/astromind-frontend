@@ -30,7 +30,11 @@ const contentSecurityPolicy = () => ({
   ],
 })
 
+// Кратък commit на изданието (Render го дава при build); показва се в Настройки, за да се знае кой код работи
+const buildCommit = (process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || '').slice(0, 40)
+
 export default defineConfig({
+  define: { __BUILD_COMMIT__: JSON.stringify(buildCommit) },
   plugins: [react(), contentSecurityPolicy()],
   server: {
     proxy: {

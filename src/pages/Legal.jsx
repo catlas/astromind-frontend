@@ -1,9 +1,13 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CHECK_SCOPE, PRODUCT_STEPS } from '../utils/howItWorks';
+import HowItWorks from '../components/HowItWorks';
 
 // ЧЕРНОВА: текстовете трябва да бъдат прегледани от юрист преди публичното пускане.
 // Полетата в [СКОБИ] се попълват с данните на търговеца.
 const LEGAL_DRAFT = true;
+// Списъкът на обработващите данни (Render, AI доставчици, Stripe, имейл) е проверен срещу действителните договори: false, докато собственикът не го потвърди
+const PROCESSORS_VERIFIED = false;
 const VERSION = '2026-10-10';
 
 const COMPANY = {
@@ -35,7 +39,8 @@ const Terms = () => (
         предназначено за развлечение, самоанализ и размисъл. То не е медицински, психологически, финансов или правен
         съвет, не предсказва неизбежни събития и не бива да бъде единствена основа за важни решения.
       </p>
-      <p>Текстовете се генерират автоматично и могат да съдържат неточности.</p>
+      <p>Текстовете се генерират автоматично и могат да съдържат неточности. {CHECK_SCOPE}</p>
+      <HowItWorks compact title="Как работи" steps={PRODUCT_STEPS} />
     </Section>
     <Section title="3. Акаунт">
       <p>
@@ -216,7 +221,7 @@ const Legal = () => {
         <h1 className="text-3xl font-bold">{current.title}</h1>
         {LEGAL_DRAFT && (
           <p className="text-xs text-yellow-200/80 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
-            Чернова, в процес на юридически преглед.
+            Чернова, в процес на юридически преглед.{!PROCESSORS_VERIFIED ? ' Списъкът на обработващите лични данни още се проверява.' : ''}
           </p>
         )}
         <Component />

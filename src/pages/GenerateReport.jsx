@@ -13,7 +13,7 @@ import { emptyPlace, normalizePlace, placeBlocker, placeFromParts, placeFromProf
 import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, apiErrorMessage, fetchProfiles, migrateLocalData, REPORT_TYPE_LABELS, upsertProfile } from '../utils/api';
 import { CONTEXT_OPTIONS, PARENT_OPTIONS, relationLabel, suggestContext, suggestParentRole } from '../utils/relations';
-import { accessLabel, availableFor, balanceOf, formatEur, periodMonths, quoteFor, withBalance } from '../utils/money';
+import { accessLabel, availableFor, balanceOf, formatEur, periodMonths, quoteFor, withBalance, partnerSurchargeText } from '../utils/money';
 import {
   STAGE_MESSAGES, STAGE_STEPS, cancelJob, createJob, fetchJob, fetchJobLimits, fetchJobs, forgetJob, isActive, newKey,
   recallInputs, recallJob, recentFinishedJob, rememberInputs, rememberJob, waitText,
@@ -1585,6 +1585,7 @@ const GenerateReport = () => {
                       {quote.premium && (
                         <p className="text-xs text-gray-400">
                           {enablePartner && !isDynamic ? 'Анализът за двама' : 'Прогнозата за период'} е премиум услуга: плаща се само от внесени средства, не от подаръка.
+                          {isDynamic && enablePartner ? ` Цената включва ${partnerSurchargeText(billingConfig.prices)} за втория човек.` : ''}
                         </p>
                       )}
                     </div>

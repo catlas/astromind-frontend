@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/auth';
-import { FALLBACK_LIMITS, FALLBACK_PRICES, FALLBACK_SIGNUP_GIFT, FALLBACK_TOPUPS, formatEur } from '../utils/money';
+import { FALLBACK_LIMITS, FALLBACK_PRICES, FALLBACK_SIGNUP_GIFT, FALLBACK_TOPUPS, formatEur, partnerSurchargeText } from '../utils/money';
+import { CHECK_SCOPE, PRODUCT_STEPS, billingSteps } from '../utils/howItWorks';
+import HowItWorks from '../components/HowItWorks';
 import AstroChart from '../components/AstroChart';
 import { sampleChart, sampleExcerpt, sampleMeta } from '../data/sampleReading';
 
@@ -277,14 +279,14 @@ const Home = () => {
             <h1 className="text-white text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] tracking-tight mb-6">
               Твоят личен<br/>
               AI астролог.<br/>
-              <span className="text-[#5211d4] block">Точен.</span>
+              <span className="text-[#5211d4] block">Изчислен.</span>
               <span className="text-[#5211d4] block">Ясен.</span>
               <span className="text-white">На български.</span>
             </h1>
             
             <p className="text-slate-400 text-lg font-normal leading-relaxed max-w-[540px] mb-8">
               Позициите, домовете и аспектите се изчисляват по астрономически данни, а AI ги обяснява на български. Готовият
-              текст се сверява с изчислените факти. За себепознание и размисъл: не е терапия и не е медицински, правен или финансов съвет.
+              текст минава през автоматична проверка, която не гарантира, че всяко твърдение е вярно. За себепознание и размисъл: не е терапия и не е медицински, правен или финансов съвет.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mb-8">
@@ -343,7 +345,7 @@ const Home = () => {
             <div className="flex flex-col gap-4 text-center items-center">
               <h2 className="text-[#5211d4] font-bold tracking-wider uppercase text-sm">Какво е различното</h2>
               <h3 className="text-white tracking-tight text-3xl font-bold leading-tight md:text-4xl max-w-[720px]">
-                Изчисленията са точни, обясненията са от AI
+                Числата са изчислени, обясненията са от AI
               </h3>
               <p className="text-slate-400 text-base font-normal leading-normal max-w-[640px]">
                 Астрология за себепознание и размисъл, а не за предсказване на съдбата. Числата идват от програма, не от езиков модел.
@@ -352,7 +354,7 @@ const Home = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 ['pie_chart', 'Изчислени карти', 'Позиции на планетите, домове и аспекти по ефемериди Swiss Ephemeris, с историческата часова зона на мястото. Час, който не съществува или се повтаря (смяна на времето), не се поправя тихо: питаме ви. Без известен час няма Асцендент и домове.'],
-                ['fact_check', 'Сверен текст', 'Готовият анализ се сверява с изчислените факти: дом, знак, аспект, дата. При несъответствие текстът се поправя, а ако и тогава не е верен, не се записва и не се таксува.'],
+                ['fact_check', 'Автоматична проверка', `${CHECK_SCOPE} Текст, в който несъответствието остане, не се записва и не се таксува.`],
                 ['groups', 'Анализ с друг човек', 'Приятел, близък, дете, колега или партньор: вие избирате какви са отношенията и анализът не предполага романтика, ако не сте я посочили.'],
               ].map(([icon, title, text]) => (
                 <div key={title} className="group flex flex-col gap-4 rounded-xl border border-white/5 bg-[#13111C] p-6 hover:border-[#5211d4]/50 transition-colors duration-300">
@@ -401,8 +403,15 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Как работи: три стъпки */}
+      <section className="relative px-6 pt-16 lg:px-40 flex justify-center bg-[#0B0616]">
+        <div className="flex flex-col max-w-[1200px] flex-1">
+          <HowItWorks id="how-it-works" steps={PRODUCT_STEPS} />
+        </div>
+      </section>
+
       {/* Услуги: само това, което приложението наистина прави */}
-      <section className="relative px-6 py-16 lg:px-40 flex justify-center bg-[#0B0616] overflow-hidden" id="how-it-works">
+      <section className="relative px-6 py-16 lg:px-40 flex justify-center bg-[#0B0616] overflow-hidden" id="services">
         <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#5211d4]/5 to-transparent pointer-events-none"></div>
         <div className="flex flex-col max-w-[1200px] flex-1 relative z-10">
           <div className="flex flex-col gap-4 text-center items-center mb-16">
@@ -411,7 +420,9 @@ const Home = () => {
               Какво можете да поискате
             </h3>
             <p className="text-slate-400 text-base font-normal leading-normal max-w-[700px]">
-              Започвате с подарък при регистрация. Основните анализи се плащат от подаръка или от баланса, а премиум услугите само от внесени средства.
+              {pricing && !pricing.balance_enforced
+                ? 'Засега всички анализи са безплатни. След старта на таксуването основните анализи ще се плащат от подаръка или от баланса, а премиум услугите само от внесени средства.'
+                : 'Започвате с подарък при регистрация. Основните анализи се плащат от подаръка или от баланса, а премиум услугите само от внесени средства.'}
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -445,7 +456,9 @@ const Home = () => {
         <div className="flex flex-col max-w-[1000px] flex-1">
           <div className="text-center mb-12">
             <h2 className="text-white text-3xl md:text-4xl font-bold mb-4">
-              Започнете с подарък. Плащайте само за това, което ползвате.
+              {pricing && !pricing.balance_enforced
+                ? 'Засега е безплатно. След старта плащате само за това, което ползвате.'
+                : 'Започнете с подарък. Плащайте само за това, което ползвате.'}
             </h2>
             <p className="text-slate-400">Без абонамент: предплатен баланс в евро, от който се взема само при успешен анализ.</p>
             {pricing && !pricing.balance_enforced && (
@@ -454,6 +467,13 @@ const Home = () => {
               </p>
             )}
           </div>
+          {pricing && (
+            <HowItWorks
+              compact
+              title="Как работят цените"
+              steps={billingSteps({ enforced: !!pricing.balance_enforced, gift: Number(pricing.signup_gift_cents) || 0, prices: pricing.prices })}
+            />
+          )}
           {(() => {
             const prices = { ...FALLBACK_PRICES, ...(pricing?.prices || {}) };
             const eur = formatEur;
@@ -536,7 +556,7 @@ const Home = () => {
                       <span>
                         Прогноза по месеци с общ преглед на периода
                         {limits.forecast_max_months_single && limits.forecast_max_months_pair
-                          ? ` (до ${limits.forecast_max_months_single} месеца за един човек, до ${limits.forecast_max_months_pair} за двама; за двама +${eur(prices.forecast_partner_extra)} към цената)`
+                          ? ` (до ${limits.forecast_max_months_single} месеца за един човек, до ${limits.forecast_max_months_pair} за двама; за двама ${partnerSurchargeText(prices)})`
                           : ''}
                       </span>
                     </li>
@@ -580,7 +600,7 @@ const Home = () => {
               <ul className="list-disc pl-5 space-y-2">
                 <li>Не е терапия, диагноза, медицински, правен или финансов съвет. При криза или здравословен проблем потърсете специалист.</li>
                 <li>Не предсказва бъдещето. Астрологията е рамка за размисъл, а не доказана наука.</li>
-                <li>AI може да сгреши. Позициите, домовете и аспектите са изчислени и текстът се сверява с тях, но тълкуването е негово.</li>
+                <li>AI може да сгреши. Позициите, домовете и аспектите са изчислени, а автоматичната проверка сверява с тях само част от твърденията в текста и не гарантира, че всичко е вярно. Тълкуването е на AI.</li>
                 <li>Мястото на раждане е точка на населено място, не точен адрес. Без час на раждане няма Асцендент и домове.</li>
               </ul>
             </div>
@@ -608,7 +628,7 @@ const Home = () => {
               <h2 className="text-lg font-bold">AstroMind</h2>
             </div>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Астрологични карти и анализи на български за себепознание. Изчисленията са точни, а обясненията са от AI.
+              Астрологични карти и анализи на български за себепознание. Числата са изчислени, а обясненията са от AI.
             </p>
           </div>
           <div className="flex gap-10 md:gap-20 flex-wrap">

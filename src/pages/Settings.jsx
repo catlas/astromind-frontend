@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { verifySession, clearSessionAndRedirect, getApiBaseUrl } from '../utils/auth';
 import axios from 'axios';
 import { api, apiErrorMessage, fetchProfiles } from '../utils/api';
+import { billingSteps } from '../utils/howItWorks';
+import HowItWorks from '../components/HowItWorks';
+import BuildInfo from '../components/BuildInfo';
 import { FALLBACK_PRICES, accessLabel, balanceOf, formatEur, giftOf, paidOf } from '../utils/money';
 
 const TABS = [
@@ -259,6 +262,7 @@ export default function Settings() {
   // User menu popup
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [logoutAllMsg, setLogoutAllMsg] = useState(null);
 
   // Цени и режим на таксуване (за раздела „Баланс“)
   const [billingConfig, setBillingConfig] = useState(null);
@@ -617,7 +621,7 @@ export default function Settings() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
-                    hint="Минимум 6 символа"
+                    hint="Минимум 10 символа, с поне една буква и една цифра"
                   />
                   <InputField
                     label="Потвърди новата парола"
@@ -715,10 +719,20 @@ export default function Settings() {
                   <div>
                     <p className="text-sm font-medium text-white">Изход от всички устройства</p>
                     <p className="text-xs text-[#a69db9] mt-0.5">Всички влезли устройства, и това, трябва да влязат отново с парола</p>
+                    {logoutAllMsg && (
+                      <p role="alert" className="text-xs text-red-400 mt-1.5">{logoutAllMsg}</p>
+                    )}
                   </div>
                   <button
                     onClick={async () => {
-                      try { await api.post('/logout-all'); } catch { /* сесията така или иначе се чисти тук */ }
+                      // Отменяме другите сесии на сървъра. При грешка не твърдим, че са отменени: показваме причината и оставаме влезли
+                      setLogoutAllMsg(null);
+                      try {
+                        await api.post('/logout-all');
+                      } catch (err) {
+                        setLogoutAllMsg(apiErrorMessage(err, 'Не успяхме да изпратим заявката. Другите устройства все още може да са влезли. Опитайте отново.'));
+                        return;
+                      }
                       clearSessionAndRedirect(navigate);
                     }}
                     className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-slate-700 text-slate-300 text-sm rounded-xl transition-all flex-shrink-0"
@@ -776,6 +790,7 @@ export default function Settings() {
                 </div>
               </div>
             </SectionCard>
+            <BuildInfo />
           </div>
         );
 
@@ -806,6 +821,14 @@ export default function Settings() {
                   {accessLabel(user)}
                 </span>
               </div>
+
+              {billingConfig && (
+                <HowItWorks
+                  compact
+                  title="Как работи"
+                  steps={billingSteps({ enforced: !free, gift: Number(billingConfig.signup_gift_cents) || 0, prices: billingConfig.prices })}
+                />
+              )}
 
               <div className="flex items-center gap-3 mb-5">
                 <span className="material-symbols-outlined text-yellow-400" style={{ fontSize: '28px' }}>account_balance_wallet</span>
