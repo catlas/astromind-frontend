@@ -5,6 +5,7 @@ import { api, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } f
 import { BigThreeCard } from './Welcome';
 import { accessLabel, balanceOf, formatEur, giftOf, paidOf } from '../utils/money';
 import { relationLabel } from '../utils/relations';
+import { circleChips, circleVisible } from '../utils/circle';
 
 // Снимката на нощното небе (Unsplash) е отгоре; ако не се зареди, остава нощното небе от CSS (само картинки в списъка, цветът е отделно)
 const SKY_FALLBACK = [
@@ -18,13 +19,7 @@ const SKY_FALLBACK = [
 ].join(', ');
 const SKY_BACKGROUND = `url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=2000&auto=format&fit=crop'), ${SKY_FALLBACK}`;
 
-const CIRCLE_LIMIT = 4;
-const GROUPS = [
-  { id: 'family', label: 'Семейство', relations: ['spouse', 'partner', 'child', 'relative', 'family'] },
-  { id: 'friends', label: 'Приятели', relations: ['friend'] },
-  { id: 'other', label: 'Други', relations: ['other'] },
-];
-const groupOf = (profile) => (GROUPS.find((g) => g.relations.includes(profile.relation)) || GROUPS[2]).id;
+const CIRCLE_CONCURRENCY = 4;                          // най-много толкова профила се четат от сървъра едновременно (до 50 профила)
 const initials = (name) => (name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || '?';
 
 const Dashboard = () => {
@@ -36,7 +31,7 @@ const Dashboard = () => {
   const [recentReports, setRecentReports] = useState([]);
   const [verifyMsg, setVerifyMsg] = useState('');
   const [insight, setInsight] = useState(null);
-  const [circle, setCircle] = useState(null);          // [{ profile, insight }]: първите профили с Голяма тройка (null = още се зарежда)
+  const [circle, setCircle] = useState(null);          // { all: всички профили, insights: { id профил: Голяма тройка | null } } (null = още се зарежда)
   const [circleFilter, setCircleFilter] = useState('all');
 
   const resendVerification = async () => {
@@ -61,19 +56,26 @@ const Dashboard = () => {
         }
         setUser(sessionUser);
         api.get('/insights/big-three').then((r) => isMounted && setInsight(r.data)).catch(() => {});
-        api.get('/profiles').then(async (r) => {
+        api.get('/profiles').then((r) => {
           const list = Array.isArray(r.data) ? r.data : [];
-          const shown = list.slice(0, CIRCLE_LIMIT);
-          const loaded = await Promise.all(shown.map(async (profile) => {
-            try {
-              const res = await api.get('/insights/big-three', { params: { profile_id: profile.id } });
-              return { profile, insight: res.data };
-            } catch {
-              return { profile, insight: null };        // профил без място на раждане: показва се без знаци
+          if (!isMounted) return;
+          setCircle({ all: list, insights: {} });       // всички карти се показват веднага; знаците им идват една по една
+          let next = 0;
+          const worker = async () => {
+            while (next < list.length && isMounted) {
+              const profile = list[next];
+              next += 1;
+              let info = null;                          // профил без място на раждане: показва се без знаци
+              try {
+                info = (await api.get('/insights/big-three', { params: { profile_id: profile.id } })).data;
+              } catch {
+                info = null;
+              }
+              if (isMounted) setCircle((prev) => (prev ? { ...prev, insights: { ...prev.insights, [profile.id]: info } } : prev));
             }
-          }));
-          if (isMounted) setCircle({ all: list, shown: loaded });
-        }).catch(() => isMounted && setCircle({ all: [], shown: [] }));
+          };
+          Promise.all(Array.from({ length: Math.min(CIRCLE_CONCURRENCY, list.length) }, worker));
+        }).catch(() => isMounted && setCircle({ all: [], insights: {} }));
         try {
           await migrateLocalData();
           const reports = await fetchReports(3);
@@ -477,8 +479,8 @@ const Dashboard = () => {
                   if (circle === null) {
                     return <div className="p-4 rounded-xl bg-[#1f1c27] border border-slate-800/50 text-sm text-slate-400">Зареждане на близките…</div>;
                   }
-                  const present = GROUPS.filter((g) => circle.all.some((p) => groupOf(p) === g.id));
-                  const visible = circle.shown.filter(({ profile }) => circleFilter === 'all' || groupOf(profile) === circleFilter);
+                  const present = circleChips(circle.all);
+                  const visible = circleVisible(circle.all, circleFilter);
                   const chip = (id, label) => (
                     <button key={id} type="button" onClick={() => setCircleFilter(id)} aria-pressed={circleFilter === id}
                       className={`px-3 py-1 rounded-full text-xs border ${circleFilter === id ? 'bg-[#5211d4] border-[#5211d4] text-white' : 'border-slate-700 text-slate-300 hover:border-[#5211d4]/60'}`}>
@@ -502,9 +504,10 @@ const Dashboard = () => {
                           {present.map((g) => chip(g.id, g.label))}
                         </div>
                       )}
-                      {visible.map(({ profile, insight: info }) => {
+                      {visible.map((profile) => {
+                        const info = circle.insights[profile.id];                  // undefined = още се чете; null = няма данни
                         const self = profile.is_primary || profile.relation === 'self';
-                        const sign = (item) => item?.sign_bg || '—';
+                        const sign = (item) => (info === undefined ? '…' : (item?.sign_bg || '—'));
                         return (
                           <div key={profile.id} className="group p-4 rounded-xl bg-[#1f1c27] border border-slate-800/50 hover:border-[#5211d4]/50 transition-all shadow-sm">
                             <div className="flex items-start justify-between mb-4">

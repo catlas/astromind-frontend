@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Sparkles, Calendar, Clock, MessageSquare, User, Users, TrendingUp, Activity, Infinity } from 'lucide-react';
+import { Check, Loader2, Sparkles, Calendar, Clock, MessageSquare, User, Users, TrendingUp, Activity, Infinity } from 'lucide-react';
 import AstroChart from '../components/AstroChart';
 import ReportText from '../components/ReportText';
 import ReportExport from '../components/ReportExport';
@@ -14,6 +14,7 @@ import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, apiErrorMessage, fetchProfiles, migrateLocalData, REPORT_TYPE_LABELS, upsertProfile } from '../utils/api';
 import { CONTEXT_OPTIONS, PARENT_OPTIONS, relationLabel, suggestContext, suggestParentRole } from '../utils/relations';
 import { accessLabel, availableFor, balanceOf, formatEur, periodMonths, quoteFor, withBalance, partnerSurchargeText } from '../utils/money';
+import { maxEndDate, nextPeriod } from '../utils/period';
 import {
   STAGE_MESSAGES, STAGE_STEPS, cancelJob, createJob, fetchJob, fetchJobLimits, fetchJobs, forgetJob, isActive, newKey,
   recallInputs, recallJob, recentFinishedJob, rememberInputs, rememberJob, waitText,
@@ -47,21 +48,16 @@ const formatInterpretation = (items) => items.map((m, idx) => {
   return `${separator}## ${m.isOverview ? '🔭' : '📅'} ${m.month}\n\n${m.text}`;
 }).join('\n\n');
 
-// Последният позволен ден за период, започващ на startIso (YYYY-MM-DD): краят на maxMonths-я календарен месец.
-const maxEndDate = (startIso, maxMonths) => {
-  const [y, m] = String(startIso || '').split('-').map(Number);
-  if (!y || !m) return '';
-  const last = new Date(y, m - 1 + maxMonths, 0);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`;
-};
+// След успешен анализ всички стъпки остават видими толкова време, преди да се върне бутонът
+const DONE_HOLD_MS = 2200;
 
 // Реалните етапи на задачата (без измислен процент): изчисляване → анализ → проверка → готово
 const STAGE_RANK = { queued: 0, calculating: 1, analyzing: 2, checking: 3, finishing: 4, done: 5 };
 
-const JobStages = ({ stage, waitingLong }) => {
-  // Току-що създадена задача още е "в опашка", но изчислението започва веднага: първият етап се показва като текущ
-  const current = stage === 'queued' ? STAGE_RANK.calculating : (STAGE_RANK[stage] ?? 0);
+const JobStages = ({ stage, waitingLong, complete = false }) => {
+  // Току-що създадена задача още е "в опашка", но изчислението започва веднага: първият етап се показва като текущ.
+  // complete: анализът е готов, и четирите стъпки са отметнати (без текуща)
+  const current = complete ? STAGE_RANK.done + 1 : stage === 'queued' ? STAGE_RANK.calculating : (STAGE_RANK[stage] ?? 0);
   return (
     <div className="space-y-1">
       <ol className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
@@ -153,6 +149,8 @@ const GenerateReport = () => {
   const [needsBalance, setNeedsBalance] = useState(false); // сървърът отказа анализа заради недостиг на средства
   const [notice, setNotice] = useState('');               // спокойно съобщение (напр. отказана задача), не грешка
   const [activeJob, setActiveJob] = useState(null);        // състоянието на задачата, която следим
+  const [holdDone, setHoldDone] = useState(false);          // 2 секунди след успех: всичките четири стъпки са отметнати, после идва бутонът
+  const holdTimer = useRef(null);
   const [jobLimits, setJobLimits] = useState(null);        // колко анализа остават и кога може нов опит
   const pollRef = useRef({ timer: null, jobId: null, seen: 0, months: [], failures: 0, stopped: true, startedAt: 0, payloadKey: null });
   const submitKeys = useRef(new Map());                    // ключ за идемпотентност за всяка различна заявка
@@ -226,7 +224,7 @@ const GenerateReport = () => {
             // Приключила е, докато страницата е била затворена: показваме резултата и я забравяме
             pollRef.current = { ...pollRef.current, jobId: remembered, seen: 0, months: [], stopped: false, payloadKey: null };
             (job.events || []).forEach(applyEvent);
-            finishJob(job);
+            finishJob(job, { hold: false });
           }
         } catch {
           forgetJob(user.id);
@@ -235,6 +233,7 @@ const GenerateReport = () => {
     }
     return () => {
       alive = false;
+      clearTimeout(holdTimer.current);
       stopPolling();      // анализът продължава на сървъра; при връщане се намира по запомнения номер
     };
   }, [user?.id]);
@@ -603,7 +602,7 @@ const GenerateReport = () => {
   };
 
   // Краят на задачата: успех, неуспех или отказ. Неуспешната задача не оставя недовършени месеци на екрана.
-  const finishJob = (job) => {
+  const finishJob = (job, { hold = true } = {}) => {
     stopPolling();
     setActiveJob(job);
     setLoading(false);
@@ -624,6 +623,11 @@ const GenerateReport = () => {
     if (job.status === 'succeeded') {
       setResultMeta(pendingMetaRef.current);        // резултатът е със собствените си параметри, не с тези на формата след това
       setPreviousCard(null);
+      if (hold) {
+        setHoldDone(true);
+        clearTimeout(holdTimer.current);
+        holdTimer.current = setTimeout(() => setHoldDone(false), DONE_HOLD_MS);
+      }
     }
     if (job.status === 'failed') {
       setError(job.error?.message || 'Анализът не успя. Сумата е върната.');
@@ -692,6 +696,8 @@ const GenerateReport = () => {
     stopPolling();
     pollRef.current = { timer: null, jobId, seen: 0, months: [], failures: 0, stopped: false, startedAt: Date.now(), payloadKey };
     if (user?.id) rememberJob(user.id, jobId);
+    clearTimeout(holdTimer.current);
+    setHoldDone(false);
     setLoading(true);
     if (resumed) setLoadingMessage('Анализът продължава на сървъра…');
     pollJob(jobId);
@@ -742,6 +748,7 @@ const GenerateReport = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setActiveJob(null);        // докато новата задача се създава, редът със стъпките не показва края на предишната
     setLoadingMessage('');
     setError(null);
     setNeedsBalance(false);
@@ -861,6 +868,8 @@ const GenerateReport = () => {
         people: [requestData.name, requestData.partner_name].filter(Boolean).join(' и ') || 'Без име',
         mode: requestData.is_dynamic ? 'За период' : (requestData.target_date ? 'За дата' : 'Натален'),
         theme: REPORT_TYPE_LABELS[reportType] || 'Анализ',
+        periodEnd: requestData.is_dynamic ? requestData.end_date : null,       // за „Следващите N месеца“: краят на този период
+        inputs: requestData.is_dynamic ? collectInputs() : null,              // и формата, както е изпратена: продължението е със същите данни
         when: requestData.is_dynamic ? `${formatBgDate(requestData.target_date)} – ${formatBgDate(requestData.end_date)}`
           : (requestData.target_date ? `${formatBgDate(requestData.target_date)} ${requestData.target_time || ''}`.trim() : ''),
       };
@@ -901,6 +910,25 @@ const GenerateReport = () => {
     } finally {
       if (!attached) setLoading(false);
     }
+  };
+
+  // Продължение на период: същите данни, следващият период след края на показания резултат. Само попълва формата:
+  // нов анализ започва едва с бутона за изпращане, където се виждат цената и балансът. Броят продължения не е ограничен.
+  const continuation = (() => {
+    if (!resultMeta?.periodEnd || !resultMeta.inputs) return null;
+    const months = resultMeta.inputs.enablePartner ? forecastLimits.forecast_max_months_pair : forecastLimits.forecast_max_months_single;
+    const next = nextPeriod(resultMeta.periodEnd, months);
+    return next ? { ...next, months: periodMonths(next.start, next.end) } : null;
+  })();
+
+  const handleContinue = () => {
+    if (!continuation) return;
+    const saved = resultMeta.inputs;
+    restoreInputs({ ...saved, analysisMode: 'period', transitData: { ...saved.transitData, target_date: continuation.start }, endDate: continuation.end });
+    setError(null);
+    setNotice('');
+    setCrisisHtml('');
+    document.getElementById('report-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   if (!user) return null;
@@ -1096,7 +1124,7 @@ const GenerateReport = () => {
                 Въвеждане на данни
               </h2>
               
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form id="report-form" onSubmit={handleSubmit} className="space-y-4">
                 {/* Profile Selector */}
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-300">
@@ -1604,13 +1632,15 @@ const GenerateReport = () => {
 
                 <button
                   type="submit"
-                  disabled={loading || formBlocked || (jobLimits ? !jobLimits.can_start : false)}
+                  disabled={loading || holdDone || formBlocked || (jobLimits ? !jobLimits.can_start : false)}
                   className={`w-full font-bold py-3 px-4 rounded-lg shadow-lg transition-all flex justify-center items-center gap-2
                     ${loading 
                       ? 'bg-gray-600 cursor-not-allowed opacity-80' 
-                      : enablePartner
-                        ? 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white transform hover:scale-[1.02]'
-                        : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white transform hover:scale-[1.02]'
+                      : holdDone
+                        ? 'bg-emerald-700 text-white cursor-default'
+                        : enablePartner
+                          ? 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white transform hover:scale-[1.02]'
+                          : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white transform hover:scale-[1.02]'
                     }`}
                 >
                   {loading ? (
@@ -1626,6 +1656,11 @@ const GenerateReport = () => {
                             : 'ГЕНЕРИРАНЕ НА ПОДРОБЕН АНАЛИЗ')}
                         </span>
                       </div>
+                    </>
+                  ) : holdDone ? (
+                    <>
+                      <Check className="w-5 h-5" />
+                      Анализът е готов
                     </>
                   ) : (
                     <>
@@ -1665,6 +1700,13 @@ const GenerateReport = () => {
                         Откажи анализа
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* Успех: всичките четири стъпки остават отметнати още малко, преди бутонът да се върне */}
+                {!loading && holdDone && (
+                  <div className="space-y-3" data-testid="job-done">
+                    <JobStages complete />
                   </div>
                 )}
               </form>
@@ -1801,6 +1843,21 @@ const GenerateReport = () => {
               <p className="mb-3 text-xs text-slate-400" data-testid="result-meta">
                 Резултат за: {[resultMeta.people, resultMeta.mode, resultMeta.theme, resultMeta.when].filter(Boolean).join(' · ')}
               </p>
+            )}
+
+            {!loading && continuation && result && result.interpretation && (
+              <div className="mb-4 rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-3" data-testid="next-period">
+                <button
+                  type="button"
+                  onClick={handleContinue}
+                  className="rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
+                >
+                  Следващите {continuation.months} месеца: {formatBgDate(continuation.start)} – {formatBgDate(continuation.end)}
+                </button>
+                <p className="mt-2 text-xs text-slate-300">
+                  Попълва формата със същите данни за следващия период. Нов анализ започва едва когато го потвърдите, а цената се вижда преди това.
+                </p>
+              </div>
             )}
 
             {!loading && !result && (

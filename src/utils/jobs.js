@@ -43,6 +43,11 @@ export const fetchJobLimits = async () => (await api.get('/jobs/limits')).data;
 
 export const fetchJobs = async (params = {}) => (await api.get('/jobs', { params })).data.jobs;
 
+// Скриване от История на неуспешна или отказана задача (парите и отчетите не се пипат)
+export const hideJob = async (id) => (await api.post(`/jobs/${id}/hide`)).data;
+
+export const hideFailedJobs = async () => (await api.post('/jobs/hide-failed')).data;
+
 const storageKey = (userId) => `astro_active_job_${userId}`;
 
 export const rememberJob = (userId, jobId) => {

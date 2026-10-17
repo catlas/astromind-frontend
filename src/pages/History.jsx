@@ -6,7 +6,7 @@ import { filterGroups, filterItems, profileOptions } from '../utils/historyFilte
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
 import { api, deleteReport, fetchReport, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 import { accessLabel, balanceOf, formatEur } from '../utils/money';
-import { fetchJobs, isActive, rememberJob } from '../utils/jobs';
+import { fetchJobs, hideFailedJobs, hideJob, isActive, rememberJob } from '../utils/jobs';
 
 export default function History() {
   const navigate = useNavigate();
@@ -26,12 +26,36 @@ export default function History() {
   const [timeline, setTimeline] = useState(null);
   const [timelineError, setTimelineError] = useState('');
   const [jobs, setJobs] = useState([]);   // анализи в процес и неуспешни от последното денонощие (Фаза 11)
+  const [hideError, setHideError] = useState('');
 
   const loadJobs = async () => {
     try {
       setJobs(await fetchJobs({ limit: 10 }));
     } catch {
       // без задачите историята пак работи
+    }
+  };
+
+  // „Скрий“: неуспешният запис изчезва от История (сървърът го пази скрит); списъкът се чете наново, за да се покажат следващите
+  const hideOne = async (job) => {
+    setHideError('');
+    try {
+      await hideJob(job.id);
+      setJobs((prev) => prev.filter((j) => j.id !== job.id));
+      loadJobs();
+    } catch {
+      setHideError('Записът не беше скрит. Опитайте отново.');
+    }
+  };
+
+  const hideAllFailed = async () => {
+    setHideError('');
+    try {
+      await hideFailedJobs();
+      setJobs((prev) => prev.filter((j) => isActive(j) || j.status === 'succeeded'));
+      loadJobs();
+    } catch {
+      setHideError('Записите не бяха скрити. Опитайте отново.');
     }
   };
 
@@ -389,6 +413,14 @@ export default function History() {
 
           {visibleJobs.length > 0 && (
             <div className="mb-6 space-y-2">
+              {visibleJobs.filter((j) => !isActive(j)).length > 1 && (
+                <div className="flex justify-end">
+                  <button type="button" onClick={hideAllFailed} className="text-xs text-[#d4c8ed] underline hover:text-white" data-testid="hide-all-failed">
+                    Скрий всички неуспешни
+                  </button>
+                </div>
+              )}
+              {hideError && <p className="text-xs text-[#f87171]" role="alert">{hideError}</p>}
               {visibleJobs.map((j) => (
                 <div key={j.id} className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 text-sm ${isActive(j) ? 'border-[#7c5dfa]/40 bg-[#7c5dfa]/10' : 'border-[#f87171]/30 bg-[#f87171]/10'}`}>
                   <span className="material-symbols-outlined">{isActive(j) ? 'hourglass_top' : 'error'}</span>
@@ -405,6 +437,12 @@ export default function History() {
                   <button onClick={() => openGenerator(j)} className="px-3 py-1.5 rounded-lg bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-xs font-bold">
                     {isActive(j) ? 'Отвори' : 'Нов опит'}
                   </button>
+                  {!isActive(j) && (
+                    <button onClick={() => hideOne(j)} aria-label="Скрий този запис от История" title="Скрий този запис от История"
+                      className="px-3 py-1.5 rounded-lg border border-[#d4c8ed]/40 text-[#d4c8ed] hover:bg-white/10 text-xs font-bold" data-testid="hide-job">
+                      Скрий
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
