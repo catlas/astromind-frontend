@@ -23,3 +23,7 @@ export const nextPeriod = (endIso, maxMonths) => {
   const end = maxEndDate(start, maxMonths);
   return start && end ? { start, end } : null;
 };
+
+// Началото на възстановен от профила период: не е в миналото. Запазеният период може да е започнал преди дни (края му още не е
+// минал), а новият анализ за него би говорил за минали дати: началото се мести на днес (YYYY-MM-DD се сравнява като текст).
+export const restoredPeriodStart = (savedStart, today) => (savedStart && savedStart >= today ? savedStart : today);

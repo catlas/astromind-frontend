@@ -14,7 +14,7 @@ import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, apiErrorMessage, fetchProfiles, migrateLocalData, REPORT_TYPE_LABELS, upsertProfile } from '../utils/api';
 import { CONTEXT_OPTIONS, PARENT_OPTIONS, relationLabel, suggestContext, suggestParentRole } from '../utils/relations';
 import { accessLabel, availableFor, balanceOf, formatEur, periodMonths, quoteFor, withBalance, partnerSurchargeText } from '../utils/money';
-import { maxEndDate, nextPeriod } from '../utils/period';
+import { maxEndDate, nextPeriod, restoredPeriodStart } from '../utils/period';
 import {
   STAGE_MESSAGES, STAGE_STEPS, cancelJob, createJob, fetchJob, fetchJobLimits, fetchJobs, forgetJob, isActive, newKey,
   recallInputs, recallJob, recentFinishedJob, rememberInputs, rememberJob, waitText,
@@ -392,7 +392,11 @@ const GenerateReport = () => {
     const mode = savedMode === 'period' && !periodValid ? 'natal' : savedMode;
     changeAnalysisMode(mode);
     if (mode !== 'natal' && settings.transitData) {
-      setTransitData(settings.transitData);
+      // период с начало в миналото: началото става днес (края още не е минал), иначе съветите говорят за минали дати
+      const restored = mode === 'period'
+        ? { ...settings.transitData, target_date: restoredPeriodStart(settings.transitData.target_date, today) }
+        : settings.transitData;
+      setTransitData(restored);
       setTargetTouched(true);
     }
     setEndDate(mode === 'period' ? settings.endDate : '');
