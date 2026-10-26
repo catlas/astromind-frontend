@@ -1,7 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifySession } from '../utils/auth';
-import { api, apiErrorMessage } from '../utils/api';
+import axios from 'axios';
+import { api as userApi, apiErrorMessage } from '../utils/api';
+import { getApiBaseUrl } from '../utils/auth';
+
+// Отделен вход (токен в sessionStorage) или обикновен профил от ADMIN_EMAILS
+const adminToken = () => { try { return sessionStorage.getItem('adminToken'); } catch { return null; } };
+const api = {
+  get: (url, config) => (adminToken()
+    ? axios.get(`${getApiBaseUrl()}${url}`, { ...config, headers: { Authorization: `Bearer ${adminToken()}` }, timeout: 90000 })
+    : userApi.get(url, config)),
+};
 
 const EVENT_LABELS = {
   register: 'Регистрации',
@@ -164,8 +174,10 @@ const Admin = () => {
   const [loadedAt, setLoadedAt] = useState(null);
 
   const load = useCallback(async () => {
-    const user = await verifySession(navigate);
-    if (!user) return;
+    if (!adminToken()) {
+      const user = await verifySession(navigate);
+      if (!user) return;
+    }
     try {
       const [a, b] = await Promise.all([api.get('/admin/overview', { params: { days } }), api.get('/admin/metrics', { params: { days } })]);
       setOv(a.data);
@@ -173,6 +185,16 @@ const Admin = () => {
       setError('');
       setLoadedAt(new Date());
     } catch (err) {
+      const status = err.response?.status;
+      if (adminToken() && (status === 401 || status === 403)) {
+        sessionStorage.removeItem('adminToken');
+        navigate('/admin-login');
+        return;
+      }
+      if (!adminToken() && (status === 403 || status === 401)) {
+        setError('Нямате достъп с този профил. Влезте с отделния вход за собственика.');
+        return;
+      }
       setError(apiErrorMessage(err, 'Статистиката не може да се зареди.'));
     }
   }, [navigate, days]);
@@ -196,7 +218,8 @@ const Admin = () => {
               {[7, 14, 30, 90, 365].map((d) => <option key={d} value={d}>Последните {d} дни</option>)}
             </select>
             <button onClick={load} className="text-sm bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full">Обнови</button>
-            <button onClick={() => navigate('/dashboard')} className="text-sm bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full">Табло</button>
+            <button onClick={() => navigate('/admin-login')} className="text-sm bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full">Вход за собственика</button>
+            <button onClick={() => { try { sessionStorage.removeItem('adminToken'); } catch { /* няма */ } navigate('/dashboard'); }} className="text-sm bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full">Табло</button>
           </div>
         </div>
 

@@ -12,6 +12,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const ResetPassword = lazy(() => import('./pages/AuthLinkPages').then((m) => ({ default: m.ResetPassword })));
 const VerifyEmail = lazy(() => import('./pages/AuthLinkPages').then((m) => ({ default: m.VerifyEmail })));
 const Admin = lazy(() => import('./pages/Admin'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 const Welcome = lazy(() => import('./pages/Welcome'));
 const Start = lazy(() => import('./pages/Start'));
 const Legal = lazy(() => import('./pages/Legal'));
@@ -38,6 +39,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/start" element={<Start />} />
         <Route path="/legal/:doc" element={<Legal />} />
