@@ -2,10 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifySession } from '../utils/auth';
 import { api, apiErrorMessage } from '../utils/api';
-import { bulgarianCities } from '../utils/bulgarianCities';
+import BirthDataForm, { birthPayload, emptyBirthForm } from '../components/BirthDataForm';
 import { formatEur, giftOf } from '../utils/money';
-
-const inputClass = 'w-full bg-[#0B0616] border border-white/10 p-3 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#5211d4]';
 
 const ELEMENT_COLORS = { fire: '#f87171', earth: '#a3e635', air: '#60a5fa', water: '#818cf8' };
 
@@ -91,7 +89,7 @@ const Welcome = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ name: '', birth_date: '', birth_time: '', unknown_time: false, city: 'София', lat: '42.6977', lon: '23.3219' });
+  const [form, setForm] = useState(emptyBirthForm);
   const [insight, setInsight] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -108,27 +106,17 @@ const Welcome = () => {
     return () => { isMounted = false; };
   }, [navigate]);
 
-  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const chooseCity = (name) => {
-    const city = bulgarianCities.find((c) => c.name === name);
-    setForm((f) => ({ ...f, city: name, lat: city ? String(city.lat) : f.lat, lon: city ? String(city.lon) : f.lon }));
-  };
-
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
     try {
-      const r = await api.post('/onboarding', {
-        name: form.name.trim(),
-        birth_date: form.birth_date,
-        birth_time: form.unknown_time ? '' : form.birth_time,
-        unknown_time: form.unknown_time,
-        birth_place: form.city === '__other' ? '' : form.city,
-        lat: Number(form.lat),
-        lon: Number(form.lon),
-      });
+      if (!form.gender) {
+        setError('Изберете пол.');
+        setSaving(false);
+        return;
+      }
+      const r = await api.post('/onboarding', birthPayload(form));
       setInsight(r.data);
       const stored = { ...user, onboarding_completed: true };
       localStorage.setItem('user', JSON.stringify(stored));
@@ -188,37 +176,7 @@ const Welcome = () => {
         {step === 2 && (
           <form onSubmit={submit} className="bg-[#1f1c27] rounded-3xl border border-white/10 p-8 md:p-10 space-y-5">
             <h2 className="text-2xl font-bold">Вашите данни за раждане</h2>
-            <div>
-              <label className="block text-sm text-slate-300 mb-1">Име</label>
-              <input className={inputClass} value={form.name} onChange={(e) => setField('name', e.target.value)} required maxLength={100} />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-slate-300 mb-1">Дата на раждане</label>
-                <input type="date" className={inputClass} value={form.birth_date} onChange={(e) => setField('birth_date', e.target.value)} required max={new Date().toISOString().split('T')[0]} />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-300 mb-1">Час на раждане</label>
-                <input type="time" className={inputClass} value={form.birth_time} onChange={(e) => setField('birth_time', e.target.value)} disabled={form.unknown_time} required={!form.unknown_time} />
-                <label className="flex items-center gap-2 text-xs text-slate-400 mt-2">
-                  <input type="checkbox" checked={form.unknown_time} onChange={(e) => setField('unknown_time', e.target.checked)} className="accent-purple-600" />
-                  Не знам точния час
-                </label>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-300 mb-1">Място на раждане</label>
-              <select className={inputClass} value={form.city} onChange={(e) => chooseCity(e.target.value)}>
-                {bulgarianCities.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                <option value="__other">Друго място (въведи координати)</option>
-              </select>
-              {form.city === '__other' && (
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <input className={inputClass} placeholder="Ширина, напр. 51.5074" value={form.lat} onChange={(e) => setField('lat', e.target.value)} required />
-                  <input className={inputClass} placeholder="Дължина, напр. -0.1278" value={form.lon} onChange={(e) => setField('lon', e.target.value)} required />
-                </div>
-              )}
-            </div>
+            <BirthDataForm form={form} setForm={setForm} />
             {error && <p className="text-sm text-red-400">{error}</p>}
             <div className="flex flex-wrap gap-3">
               <button disabled={saving} className="px-6 py-3 rounded-xl bg-[#5211d4] hover:bg-[#5211d4]/90 font-bold disabled:opacity-50">

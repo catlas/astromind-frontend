@@ -13,6 +13,7 @@ const ResetPassword = lazy(() => import('./pages/AuthLinkPages').then((m) => ({ 
 const VerifyEmail = lazy(() => import('./pages/AuthLinkPages').then((m) => ({ default: m.VerifyEmail })));
 const Admin = lazy(() => import('./pages/Admin'));
 const Welcome = lazy(() => import('./pages/Welcome'));
+const Start = lazy(() => import('./pages/Start'));
 const Legal = lazy(() => import('./pages/Legal'));
 
 // Старият адрес /buy-coins (линкове, запазени страници, връщане от плащане) води към новата страница, с параметрите
@@ -38,6 +39,7 @@ function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/welcome" element={<Welcome />} />
+        <Route path="/start" element={<Start />} />
         <Route path="/legal/:doc" element={<Legal />} />
       </Routes>
       </Suspense>

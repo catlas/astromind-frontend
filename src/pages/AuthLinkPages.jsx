@@ -87,7 +87,16 @@ export const VerifyEmail = () => {
       return;
     }
     axios.post(`${getApiBaseUrl()}/verify-email`, { token })
-      .then(() => {
+      .then((response) => {
+        const data = response?.data || {};
+        if (data.access_token) {
+          // Линкът влиза сам: след потвърждението човекът отива направо в таблото
+          localStorage.setItem('token', data.access_token);
+          localStorage.setItem('user', JSON.stringify(data.user || {}));
+          setStatus({ error: false, text: 'Имейлът ви е потвърден. Влизате в таблото…' });
+          setTimeout(() => navigate('/dashboard'), 1200);
+          return;
+        }
         try {
           const user = JSON.parse(localStorage.getItem('user') || 'null');
           if (user) localStorage.setItem('user', JSON.stringify({ ...user, email_verified: true }));

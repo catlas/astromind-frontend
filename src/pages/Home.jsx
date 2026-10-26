@@ -41,6 +41,8 @@ const Home = () => {
   const navigate = useNavigate();
   const [showAuth, setShowAuth] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  const [unverified, setUnverified] = useState(false);
+  const [unverifiedMsg, setUnverifiedMsg] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -91,9 +93,19 @@ const Home = () => {
     }
   };
 
+  const resendVerification = async () => {
+    try {
+      const r = await axios.post(`${getApiBaseUrl()}/resend-verification-public`, { email });
+      setUnverifiedMsg(r.data?.message || 'Изпратихме ново писмо.');
+    } catch (err) {
+      setUnverifiedMsg(err.response?.data?.detail || 'Не успяхме да изпратим писмо. Опитайте след малко.');
+    }
+  };
+
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthLoading(true);
+    setUnverified(false);
     const endpoint = isLogin ? '/login' : '/register';
     const data = isLogin ? { email, password } : { email, password, full_name: fullName, accept_terms: acceptTerms };
     
@@ -143,6 +155,11 @@ const Home = () => {
         errorMessage = error.message || 'Възникна грешка';
       }
       
+      if (isLogin && error.response?.status === 403) {
+        setUnverified(true);
+        setUnverifiedMsg('');
+        return;
+      }
       alert(errorMessage);
     } finally {
       setAuthLoading(false);
@@ -174,7 +191,7 @@ const Home = () => {
               Вход
             </button>
             <button 
-              onClick={() => { setShowAuth(true); setIsLogin(false); }}
+              onClick={() => { navigate('/start'); }}
               className="flex min-w-[84px] items-center justify-center rounded-md h-10 px-6 bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-sm font-bold transition-all shadow-[0_0_15px_rgba(82,17,212,0.3)]"
             >
               Регистрация
@@ -243,7 +260,7 @@ const Home = () => {
                 Вход
               </button>
               <button 
-                onClick={() => { setShowAuth(true); setIsLogin(false); setIsMenuOpen(false); }}
+                onClick={() => { setIsMenuOpen(false); navigate('/start'); }}
                 className="w-full flex items-center justify-center rounded-md h-10 px-6 bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-sm font-bold transition-all shadow-[0_0_15px_rgba(82,17,212,0.3)]"
               >
                 Регистрация
@@ -292,7 +309,7 @@ const Home = () => {
             
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mb-8">
               <button 
-                onClick={() => { setShowAuth(true); setIsLogin(false); }}
+                onClick={() => { navigate('/start'); }}
                 className="flex h-12 min-w-[180px] items-center justify-center rounded-lg bg-[#5211d4] hover:bg-[#5211d4]/90 px-6 text-white text-base font-bold transition-all shadow-[0_0_20px_rgba(82,17,212,0.4)]"
               >
                 Безплатен Анализ
@@ -394,7 +411,7 @@ const Home = () => {
               {sampleExcerpt.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
               <p className="text-xs text-slate-500">Откъсът е съкратен. Пълният анализ има още раздели и конкретна първа стъпка.</p>
               <button
-                onClick={() => { setShowAuth(true); setIsLogin(false); }}
+                onClick={() => { navigate('/start'); }}
                 className="self-start mt-2 px-5 py-2.5 rounded-lg bg-[#5211d4] hover:bg-[#5211d4]/90 text-white text-sm font-bold transition-all"
               >
                 Направете свой анализ
@@ -487,7 +504,7 @@ const Home = () => {
               .join(' · ');
             const goToBalance = () => {
               if (localStorage.getItem('token')) navigate('/balance');
-              else { setShowAuth(true); setIsLogin(false); }
+              else { navigate('/start'); }
             };
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
@@ -525,7 +542,7 @@ const Home = () => {
                     </li>
                   </ul>
                   <button
-                    onClick={() => { setShowAuth(true); setIsLogin(false); }}
+                    onClick={() => { navigate('/start'); }}
                     className="w-full py-3 rounded-lg border border-[#2e2839] bg-transparent text-white font-bold hover:bg-white/5 transition-all"
                   >
                     Започнете безплатно
@@ -692,6 +709,13 @@ const Home = () => {
             <>
             <h2 className="text-2xl font-bold mb-6">{isLogin ? 'Добре дошли отново' : 'Създай акаунт'}</h2>
             <form onSubmit={handleAuth} className="space-y-4">
+              {unverified && (
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-100 space-y-2">
+                  <p>Потвърдете имейла си, за да влезете. Изпратихме ви писмо с линк; ако не го виждате, проверете в „Спам“.</p>
+                  <button type="button" onClick={resendVerification} className="underline">Изпрати писмото отново</button>
+                  {unverifiedMsg && <p className="text-yellow-50">{unverifiedMsg}</p>}
+                </div>
+              )}
               {!isLogin && (
                 <input 
                   type="text" 
@@ -762,7 +786,7 @@ const Home = () => {
             </form>
             <div className="mt-4 text-center">
               <button 
-                onClick={() => { setIsLogin(!isLogin); setEmail(''); setPassword(''); setFullName(''); }} 
+                onClick={() => { if (isLogin) { navigate('/start'); return; } setIsLogin(true); setEmail(''); setPassword(''); setFullName(''); }} 
                 className="text-[#5211d4] hover:text-[#5211d4]/80 text-sm"
               >
                 {isLogin ? 'Нямаш акаунт? Регистрирай се' : 'Вече имаш акаунт? Влез'}
