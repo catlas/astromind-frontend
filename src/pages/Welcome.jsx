@@ -9,10 +9,67 @@ const inputClass = 'w-full bg-[#0B0616] border border-white/10 p-3 rounded-lg te
 
 const ELEMENT_COLORS = { fire: '#f87171', earth: '#a3e635', air: '#60a5fa', water: '#818cf8' };
 
+const ELEMENT_INFO = {
+  fire: { icon: 'local_fire_department', signs: 'Овен, Лъв, Стрелец', gist: 'енергия, инициатива, вдъхновение' },
+  earth: { icon: 'landscape', signs: 'Телец, Дева, Козирог', gist: 'практичност, стабилност, резултати' },
+  air: { icon: 'air', signs: 'Близнаци, Везни, Водолей', gist: 'мисъл, общуване, идеи' },
+  water: { icon: 'water_drop', signs: 'Рак, Скорпион, Риби', gist: 'чувства, интуиция, близост' },
+};
+
+const levelOf = (count) => (count >= 3 ? 'силен' : count >= 1 ? 'умерен' : 'липсва');
+
+export const ElementBalance = ({ insight }) => {
+  const elements = insight.elements || [];
+  const total = Math.max(1, elements.reduce((sum, e) => sum + e.count, 0));
+  const missing = elements.filter((e) => e.count === 0).map((e) => e.name.toLowerCase());
+  return (
+    <div className="bg-[#1f1c27] rounded-2xl border border-white/10 p-5">
+      <p className="text-xs uppercase tracking-wider text-[#a69db9] mb-1">Баланс на елементите</p>
+      <p className="text-sm text-slate-400 mb-4">Колко от основните небесни тела попадат в знаци от всеки от четирите елемента.</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {elements.map((e) => {
+          const info = ELEMENT_INFO[e.id] || {};
+          const percent = Math.round((e.count / total) * 100);
+          return (
+            <div key={e.id} className="rounded-xl bg-[#161022] border border-white/5 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="material-symbols-outlined" style={{ color: ELEMENT_COLORS[e.id], fontSize: '26px' }}>{info.icon}</span>
+                <span className="text-xs text-slate-400">{levelOf(e.count)}</span>
+              </div>
+              <p className="font-bold text-white">{e.name}</p>
+              <p className="text-2xl font-extrabold text-white leading-tight">{e.count}<span className="text-sm font-normal text-slate-400"> от {total} · {percent}%</span></p>
+              <div className="h-2 rounded bg-white/5 my-2">
+                <div className="h-2 rounded" style={{ width: `${percent}%`, backgroundColor: ELEMENT_COLORS[e.id] }} />
+              </div>
+              <p className="text-xs text-slate-400">{info.gist}</p>
+              <p className="text-[11px] text-slate-500 mt-1">{info.signs}</p>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-4 text-sm text-slate-300 space-y-2">
+        <p>
+          {insight.balanced ? (
+            <b className="text-white">{insight.balance_text}</b>
+          ) : (
+            <><b className="text-white">Преобладава {insight.dominant_element.name.toLowerCase()}.</b> {insight.dominant_element.text}</>
+          )}
+        </p>
+        {missing.length > 0 && (
+          <p>Липсва {missing.join(' и ')}: това не е недостатък, а зона, която ще развиваш по-съзнателно, и често я търсиш чрез хората около себе си.</p>
+        )}
+        <p className="text-xs text-slate-500">
+          Какво показва графиката: {insight.method || 'броят е по знаците на седемте основни тела.'} Колкото повече тела в един елемент, толкова повече този начин на
+          действие и преживяване оцветява характера ти. Това е тенденция, а не присъда: цялата карта (аспекти, домове) я допълва и променя.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 export const BigThreeCard = ({ insight }) => {
   if (!insight) return null;
   const items = [insight.sun, insight.moon, insight.ascendant].filter(Boolean);
-  const maxCount = Math.max(1, ...insight.elements.map((e) => e.count));
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -24,27 +81,7 @@ export const BigThreeCard = ({ insight }) => {
           </div>
         ))}
       </div>
-      <div className="bg-[#1f1c27] rounded-2xl border border-white/10 p-5">
-        <p className="text-xs uppercase tracking-wider text-[#a69db9] mb-3">Баланс на елементите</p>
-        <div className="space-y-2">
-          {insight.elements.map((e) => (
-            <div key={e.id} className="flex items-center gap-3 text-sm">
-              <span className="w-16 text-slate-300">{e.name}</span>
-              <div className="flex-1 h-2 rounded bg-white/5">
-                <div className="h-2 rounded" style={{ width: `${(e.count / maxCount) * 100}%`, backgroundColor: ELEMENT_COLORS[e.id] }} />
-              </div>
-              <span className="w-4 text-right text-slate-400">{e.count}</span>
-            </div>
-          ))}
-        </div>
-        <p className="text-sm text-slate-300 mt-4">
-          {insight.balanced ? (
-            <b className="text-white">{insight.balance_text}</b>
-          ) : (
-            <><b className="text-white">Преобладава {insight.dominant_element.name.toLowerCase()}.</b> {insight.dominant_element.text}</>
-          )}
-        </p>
-      </div>
+      <ElementBalance insight={insight} />
       {insight.note && <p className="text-xs text-yellow-200/80">{insight.note}</p>}
     </div>
   );

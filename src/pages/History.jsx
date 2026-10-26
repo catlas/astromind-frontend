@@ -408,7 +408,8 @@ export default function History() {
             <h1 className="text-3xl lg:text-[32px] font-bold leading-tight tracking-tight text-white mb-2">
               История на четенията
             </h1>
-            <p className="text-[#d4c8ed] text-base">Преглед на всички генерирани анализи и отчети</p>
+            <p className="text-[#d4c8ed] text-base">Преглед на генерираните анализи и отчети</p>
+            <p className="text-sm text-slate-400 mt-1">Пазят се последните 50 анализа; при нов анализ най-старите се изтриват автоматично. Изтеглете важните, за да ги запазите.</p>
           </div>
 
           {visibleJobs.length > 0 && (

@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getApiBaseUrl } from '../utils/auth';
-import { FALLBACK_LIMITS, FALLBACK_PRICES, FALLBACK_SIGNUP_GIFT, FALLBACK_TOPUPS, formatEur, partnerSurchargeText } from '../utils/money';
+import { FALLBACK_LIMITS, FALLBACK_PRICES, FALLBACK_SIGNUP_GIFT, FALLBACK_TOPUPS, PRICE_SOON, formatEur, partnerSurchargeSoon } from '../utils/money';
+import PlanLimits from '../components/PlanLimits';
 import { CHECK_SCOPE, PRODUCT_STEPS, billingSteps } from '../utils/howItWorks';
 import HowItWorks from '../components/HowItWorks';
 import AstroChart from '../components/AstroChart';
@@ -463,7 +464,7 @@ const Home = () => {
             <p className="text-slate-400">Без абонамент: предплатен баланс в евро, от който се взема само при успешен анализ.</p>
             {pricing && !pricing.balance_enforced && (
               <p className="text-yellow-200/90 text-sm mt-4">
-                Засега всички анализи са безплатни. Цените по-долу ще важат от старта на таксуването.
+                Засега всички анализи са безплатни. Цените предстоят и ще бъдат обявени преди старта на таксуването.
               </p>
             )}
           </div>
@@ -474,6 +475,7 @@ const Home = () => {
               steps={billingSteps({ enforced: !!pricing.balance_enforced, gift: Number(pricing.signup_gift_cents) || 0, prices: pricing.prices })}
             />
           )}
+          <div className="max-w-3xl mx-auto mb-8"><PlanLimits /></div>
           {(() => {
             const prices = { ...FALLBACK_PRICES, ...(pricing?.prices || {}) };
             const eur = formatEur;
@@ -496,8 +498,8 @@ const Home = () => {
                     <p className="text-slate-400 text-sm mt-1">За един човек</p>
                   </div>
                   <div className="text-3xl font-bold text-white mb-6">
-                    {eur(prices.basic_analysis)}
-                    <span className="text-sm font-normal text-slate-400"> / анализ</span>
+                    {PRICE_SOON}
+                    <span className="text-sm font-normal text-slate-400"> цената предстои</span>
                     {gift > 0 && (
                       <span className="text-sm font-normal text-slate-400 block mt-1">
                         {formatEur(gift)} подарък при регистрация, без карта
@@ -540,10 +542,10 @@ const Home = () => {
                     <p className="text-slate-400 text-sm mt-1">Отключват се след първото зареждане на баланса</p>
                   </div>
                   <div className="text-3xl font-bold text-white mb-6">
-                    {eur(prices.pair_analysis)}
-                    <span className="text-sm font-normal text-slate-400"> / анализ за двама</span>
+                    {PRICE_SOON}
+                    <span className="text-sm font-normal text-slate-400"> анализ за двама</span>
                     <span className="text-sm font-normal text-slate-400 block mt-1">
-                      Прогноза за период: {eur(prices.forecast_month)} на месец
+                      Прогноза за период: {PRICE_SOON}
                     </span>
                   </div>
                   <ul className="flex flex-col gap-4 mb-8 flex-1">
@@ -556,7 +558,7 @@ const Home = () => {
                       <span>
                         Прогноза по месеци с общ преглед на периода
                         {limits.forecast_max_months_single && limits.forecast_max_months_pair
-                          ? ` (до ${limits.forecast_max_months_single} месеца за един човек, до ${limits.forecast_max_months_pair} за двама; за двама ${partnerSurchargeText(prices)})`
+                          ? ` (до ${limits.forecast_max_months_single} месеца за един човек, до ${limits.forecast_max_months_pair} за двама; за двама ${partnerSurchargeSoon()})`
                           : ''}
                       </span>
                     </li>

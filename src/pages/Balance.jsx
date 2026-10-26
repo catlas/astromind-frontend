@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { verifySession } from '../utils/auth';
 import { api, apiErrorMessage, formatDate } from '../utils/api';
-import { FALLBACK_PRICES, balanceOf, formatEur, formatSignedEur, giftOf, paidOf, partnerSurchargeText } from '../utils/money';
+import { FALLBACK_PRICES, PRICE_SOON, balanceOf, formatEur, formatSignedEur, giftOf, paidOf, partnerSurchargeSoon } from '../utils/money';
 import { billingSteps } from '../utils/howItWorks';
+import PlanLimits from '../components/PlanLimits';
 import HowItWorks from '../components/HowItWorks';
 
 const REASON_LABELS = {
@@ -210,7 +211,7 @@ const Balance = () => {
                   <p className="text-slate-400 text-sm">Натална карта или анализ за дата — за един човек</p>
                   <p className="text-xs text-slate-500 mt-1">Плаща се първо от подаръка, после от внесените средства.</p>
                 </div>
-                <p className="text-xl font-bold whitespace-nowrap">{formatEur(prices.basic_analysis)}</p>
+                <p className="text-xl font-bold whitespace-nowrap">{PRICE_SOON}</p>
               </div>
               <div className="flex items-center justify-between gap-4 px-5 py-4">
                 <div className="min-w-0">
@@ -218,7 +219,7 @@ const Balance = () => {
                   <p className="text-slate-400 text-sm">Съвместимост и синастрия между двама души</p>
                   <p className="text-xs text-slate-500 mt-1">Плаща се само от внесени средства.</p>
                 </div>
-                <p className="text-xl font-bold whitespace-nowrap">{formatEur(prices.pair_analysis)}</p>
+                <p className="text-xl font-bold whitespace-nowrap">{PRICE_SOON}</p>
               </div>
               <div className="flex items-center justify-between gap-4 px-5 py-4">
                 <div className="min-w-0">
@@ -227,13 +228,14 @@ const Balance = () => {
                     Подробен анализ за всеки календарен месец от периода, с общ преглед{limitsNote}
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
-                    За двама души: {partnerSurchargeText(prices)} (еднократно, не на месец). Плаща се само от внесени средства.
+                    За двама души: {partnerSurchargeSoon()}. Плаща се само от внесени средства.
                   </p>
                 </div>
-                <p className="text-xl font-bold whitespace-nowrap">{formatEur(prices.forecast_month)}<span className="text-sm font-normal text-slate-400"> / месец</span></p>
+                <p className="text-xl font-bold whitespace-nowrap">{PRICE_SOON}</p>
               </div>
             </div>
-            <p className="text-xs text-slate-500 mt-3">От баланса се взема само при успешно генериран анализ. Цените са с включен ДДС, когато е приложимо.</p>
+            <p className="text-xs text-slate-500 mt-3">От баланса се взема само при успешно генериран анализ. Цените предстоят и ще бъдат обявени преди старта на таксуването.</p>
+            <div className="mt-5"><PlanLimits /></div>
           </section>
         )}
 

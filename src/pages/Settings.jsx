@@ -6,7 +6,7 @@ import { api, apiErrorMessage, fetchProfiles } from '../utils/api';
 import { billingSteps } from '../utils/howItWorks';
 import HowItWorks from '../components/HowItWorks';
 import BuildInfo from '../components/BuildInfo';
-import { FALLBACK_PRICES, accessLabel, balanceOf, formatEur, giftOf, paidOf } from '../utils/money';
+import { FALLBACK_PRICES, PRICE_SOON, accessLabel, balanceOf, formatEur, giftOf, paidOf } from '../utils/money';
 
 const TABS = [
   { id: 'account', label: 'Акаунт', icon: 'manage_accounts' },
@@ -843,9 +843,9 @@ export default function Settings() {
               {billingConfig && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
                   {[
-                    { label: 'Основен анализ', cost: formatEur(prices.basic_analysis), icon: 'account_circle' },
-                    { label: 'Анализ за двама', cost: formatEur(prices.pair_analysis), icon: 'favorite' },
-                    { label: 'Прогноза за период', cost: `${formatEur(prices.forecast_month)} / месец`, icon: 'date_range' },
+                    { label: 'Основен анализ', cost: PRICE_SOON, icon: 'account_circle' },
+                    { label: 'Анализ за двама', cost: PRICE_SOON, icon: 'favorite' },
+                    { label: 'Прогноза за период', cost: PRICE_SOON, icon: 'date_range' },
                   ].map(item => (
                     <div key={item.label} className="bg-[#161022] border border-slate-800 rounded-xl p-3 flex items-center gap-3">
                       <span className="material-symbols-outlined text-[#a69db9]" style={{ fontSize: '18px' }}>{item.icon}</span>

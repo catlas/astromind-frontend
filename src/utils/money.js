@@ -80,5 +80,9 @@ export const quoteFor = (prices, { dynamic, months, hasPartner }) => {
     : { cents: p.basic_analysis, premium: false };
 };
 
+// Цените на услугите още не са обявени (20.10.2026): статичните страници показват „(предстои)“, не сума
+export const PRICE_SOON = '(предстои)';
+export const partnerSurchargeSoon = () => `допълнително заплащане ${PRICE_SOON}`;
+
 // Надбавката за втория човек при прогноза е еднократна за целия период, не за всеки месец: „+0,60 € за целия период“
 export const partnerSurchargeText = (prices) => `+${formatEur({ ...FALLBACK_PRICES, ...(prices || {}) }.forecast_partner_extra)} за целия период`;

@@ -1,5 +1,5 @@
 // Тристъпковите блокове „Как работи“ (R12). Текстовете са на едно място, за да съвпадат на всички страници и да се тестват.
-import { FALLBACK_SIGNUP_GIFT, formatEur, partnerSurchargeText } from './money';
+import { FALLBACK_SIGNUP_GIFT, formatEur, partnerSurchargeSoon } from './money';
 
 // Реалният обхват на автоматичната проверка. Не обещава, че всеки текст е фактически верен.
 export const CHECK_SCOPE =
@@ -27,7 +27,7 @@ export const PRODUCT_STEPS = [
 // Как работят парите. enforced=false е безплатната бета: нищо не се взема, правилата по-долу са бъдещи.
 export const billingSteps = ({ enforced, gift = FALLBACK_SIGNUP_GIFT, prices } = {}) => {
   const giftText = formatEur(gift);
-  const surcharge = partnerSurchargeText(prices);
+  const surcharge = partnerSurchargeSoon(prices);
   if (!enforced) {
     return [
       { icon: 'redeem', title: 'Сега: всички анализи са безплатни', text: 'По време на бетата от баланса не се взема нищо, за нито една услуга.' },
