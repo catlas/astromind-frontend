@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import ReportText from '../components/ReportText';
+import ReportViewer from '../components/ReportViewer';
 import ReportExport from '../components/ReportExport';
 import { filterGroups, filterItems, profileOptions } from '../utils/historyFilters';
 import { verifySession, clearSessionAndRedirect } from '../utils/auth';
@@ -731,7 +731,7 @@ export default function History() {
                 {viewLoading ? (
                   <p className="text-[#d4c8ed]">Зареждане…</p>
                 ) : (
-                  <ReportText text={viewingItem.content} toc />
+                  <ReportViewer key={viewingItem.id} text={viewingItem.content} toc />
                 )}
               </div>
             </div>

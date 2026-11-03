@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, Loader2, Sparkles, Calendar, Clock, MessageSquare, User, Users, TrendingUp, Activity, Infinity } from 'lucide-react';
 import AstroChart from '../components/AstroChart';
-import ReportText from '../components/ReportText';
+import ReportViewer from '../components/ReportViewer';
 import ReportExport from '../components/ReportExport';
 import ChartSummary from '../components/ChartSummary';
 import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
@@ -1884,7 +1884,7 @@ const GenerateReport = () => {
             )}
 
             {result && result.interpretation && (
-              <ReportText text={result.interpretation} toc={activeJob?.status === 'succeeded'} />
+              <ReportViewer text={result.interpretation} toc={activeJob?.status === 'succeeded'} />
             )}
           </div>
         </div>

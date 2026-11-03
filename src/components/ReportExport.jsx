@@ -65,7 +65,7 @@ export default function ReportExport({ reportId, className = '' }) {
     <div className={className}>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={Boolean(busy)} onClick={() => download('docx')} className={`${button} bg-purple-600 hover:bg-purple-700 text-white`}>
-          {busy === 'docx' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Изтегли DOCX
+          {busy === 'docx' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Изтегли пълния (DOCX)
         </button>
         <button type="button" disabled={Boolean(busy)} onClick={() => download('md')} className={`${button} bg-slate-700 hover:bg-slate-600 text-white`}>
           {busy === 'md' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Изтегли Markdown

@@ -315,6 +315,21 @@ export default function Settings() {
     }
   };
 
+  const [viewMsg, setViewMsg] = useState(null);
+  const handleReportView = async (value) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.patch(`${getApiBaseUrl()}/me`, { report_view: value }, { headers: { Authorization: `Bearer ${token}` } });
+      const { access_token: newToken, ...updated } = response.data;
+      if (newToken) localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(updated));
+      setUser(updated);
+      showMsg(setViewMsg, 'Запазено.');
+    } catch (err) {
+      showMsg(setViewMsg, err?.response?.data?.detail || 'Изборът не беше запазен.', true);
+    }
+  };
+
   const handleResendVerification = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -655,6 +670,19 @@ export default function Settings() {
       case 'preferences':
         return (
           <div className="flex flex-col gap-6">
+            <SectionCard title="Изглед на анализите" description="Какво се показва в История и след генерирането" icon="article">
+              <div className="flex flex-col gap-3 text-sm text-slate-300 leading-relaxed">
+                {[{ value: 'short', title: 'Кратък (по подразбиране)', text: 'Обобщението: обща картина, отговор на въпроса, какво да имате предвид и заключение.' },
+                  { value: 'full', title: 'Пълен', text: 'Цялата информация, включително картите за позиции и аспекти.' }].map((opt) => (
+                  <label key={opt.value} className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${((user?.report_view === 'full') ? 'full' : 'short') === opt.value ? 'border-[#7c5dfa] bg-[#5211d4]/20' : 'border-slate-800'}`}>
+                    <input type="radio" name="report_view" className="mt-1 accent-purple-600" checked={((user?.report_view === 'full') ? 'full' : 'short') === opt.value} onChange={() => handleReportView(opt.value)} />
+                    <span><b className="text-white">{opt.title}</b><br />{opt.text}</span>
+                  </label>
+                ))}
+                <p className="text-xs text-slate-400">Файлът DOCX и Markdown винаги съдържат пълния текст. На всеки отчет има и бутон да видите другия вариант само за него.</p>
+                {viewMsg && <p role="status" className={`text-xs ${viewMsg.error ? 'text-red-300' : 'text-green-400'}`}>{viewMsg.text}</p>}
+              </div>
+            </SectionCard>
             <SectionCard title="Как се изчисляват картите" description="Тези настройки са фиксирани: не се променят от акаунта" icon="public">
               <div className="flex flex-col gap-3 text-sm text-slate-300 leading-relaxed">
                 <p><b className="text-white">Зодиак:</b> тропически (западна астрология). Сидерален режим не се поддържа.</p>
