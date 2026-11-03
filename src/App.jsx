@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import Home from './pages/Home';
+import ContactUs from './components/ContactUs';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 // Първата страница се зарежда веднага, останалите екрани по заявка: по-малък първи пакет, по-бърз старт на телефон
@@ -47,6 +48,7 @@ function App() {
         <Route path="/legal/:doc" element={<Legal />} />
       </Routes>
       </Suspense>
+      <ContactUs />
     </Router>
   );
 }
