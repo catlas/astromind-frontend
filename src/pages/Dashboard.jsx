@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { clearSessionAndRedirect, verifySession } from '../utils/auth';
 import { api, fetchReports, formatDate, migrateLocalData, REPORT_TYPE_LABELS } from '../utils/api';
 import { BigThreeCard } from './Welcome';
+import ReportText from '../components/ReportText';
 import { accessLabel, balanceOf, formatEur, giftOf, paidOf } from '../utils/money';
 import { relationLabel } from '../utils/relations';
 import { circleChips, circleVisible } from '../utils/circle';
@@ -43,6 +44,33 @@ const Dashboard = () => {
       setVerifyMsg(typeof detail === 'string' ? detail : 'Писмото не беше изпратено.');
     }
   };
+
+  const [daily, setDaily] = useState(null);
+  const loadDaily = async () => {
+    try {
+      const r = await api.get('/daily-transit');
+      setDaily(r.data);
+      return r.data;
+    } catch {
+      setDaily({ status: 'failed' });
+      return null;
+    }
+  };
+  const retryDaily = async () => {
+    setDaily({ status: 'pending' });
+    try { const r = await api.post('/daily-transit/retry'); setDaily(r.data); } catch { setDaily({ status: 'failed' }); }
+  };
+  useEffect(() => {
+    if (!user) return undefined;
+    let stop = false;
+    let timer;
+    const tick = async (n) => {
+      const data = await loadDaily();
+      if (!stop && data?.status === 'pending' && n < 60) timer = setTimeout(() => tick(n + 1), 4000);
+    };
+    tick(0);
+    return () => { stop = true; clearTimeout(timer); };
+  }, [user]);
 
   useEffect(() => {
     let isMounted = true;
@@ -558,20 +586,33 @@ const Dashboard = () => {
               <div className="p-5 rounded-xl bg-gradient-to-br from-[#2a2438] to-[#161022] border border-slate-800 relative overflow-hidden h-full min-h-[300px] flex flex-col justify-between">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#5211d4]/20 blur-[60px] rounded-full pointer-events-none"></div>
                 <div>
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2 mb-1">
                     <span className="material-symbols-outlined text-[#a69db9]">travel_explore</span>
-                    <span className="text-white font-bold text-lg">Транзити за дата</span>
+                    <span className="text-white font-bold text-lg">Транзити за днес</span>
                   </div>
-                  <p className="text-slate-300 text-sm leading-relaxed mb-4">
-                    Транзитите към твоята натална карта за днешна дата (или за друга по твой избор) получаваш с анализ за дата.
+                  <p className="text-xs text-slate-400 mb-3">
+                    {daily?.day ? `${formatDate(daily.day)} · ${daily.time || '12:00'}` : ''}{daily?.profile ? ` · ${daily.profile}` : ''} · Общ анализ
                   </p>
+                  {(!daily || daily.status === 'pending') && (
+                    <p className="text-slate-300 text-sm leading-relaxed" role="status">Изчисляваме днешните транзити към вашата карта… Обикновено отнема около половин минута.</p>
+                  )}
+                  {daily?.status === 'ready' && <ReportText text={daily.text} className="text-sm" />}
+                  {daily?.status === 'no_profile' && (
+                    <p className="text-slate-300 text-sm leading-relaxed">Добавете профил с данни за раждане, за да виждате тук днешните транзити.</p>
+                  )}
+                  {daily?.status === 'failed' && (
+                    <div className="text-sm text-slate-300 space-y-2">
+                      <p>Не успяхме да подготвим днешния транзит.</p>
+                      <button type="button" onClick={retryDaily} className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-medium">Опитай отново</button>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-auto pt-4 border-t border-white/10">
                   <button
                     onClick={() => navigate('/generate-report')}
                     className="w-full py-2 rounded-lg border border-[#5211d4]/30 text-[#5211d4] hover:bg-[#5211d4] hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
-                    <span className="material-symbols-outlined text-[18px]">auto_awesome</span> Транзитен анализ
+                    <span className="material-symbols-outlined text-[18px]">auto_awesome</span> Пълен транзитен анализ
                   </button>
                 </div>
               </div>

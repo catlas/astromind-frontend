@@ -116,7 +116,7 @@ const Start = () => {
             <form onSubmit={register} className="bg-gradient-to-r from-[#5211d4]/30 to-[#7c5dfa]/10 rounded-2xl border border-[#7c5dfa]/30 p-6 space-y-4">
               <div>
                 <p className="font-bold text-lg">Запазете резултата и продължете към пълния анализ</p>
-                <p className="text-sm text-slate-300">Въведете имейл и парола. Ще изпратим писмо за потвърждение; след него влизате направо в таблото, а данните ви вече са там.</p>
+                <p className="text-sm text-slate-300">Въведете имейл и парола. Ще изпратим писмо за потвърждение; след него влизате направо в таблото, а данните ви вече са там. След това всяка сутрин в 08:00 ще получавате кратък дневен транзит по имейл; можете да го спрете с един клик (в писмото или в Настройки).</p>
               </div>
               <input type="email" required className={inputClass} placeholder="Имейл" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
               <input type="password" required minLength={10} className={inputClass} placeholder="Парола (поне 10 символа)" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />

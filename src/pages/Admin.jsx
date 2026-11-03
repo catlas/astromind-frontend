@@ -19,6 +19,8 @@ const EVENT_LABELS = {
   email_verified: 'Потвърдени имейли',
   analysis_completed: 'Завършени анализи',
   analysis_failed: 'Неуспешни анализи',
+  daily_email_sent: 'Изпратени дневни писма',
+  daily_email_failed: 'Неуспешни дневни писма',
   checkout_started: 'Започнати плащания',
   purchase_completed: 'Успешни плащания',
   pricing_viewed: 'Прегледи на цените',

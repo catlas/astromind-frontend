@@ -330,6 +330,30 @@ export default function Settings() {
     }
   };
 
+  const [mailMsg, setMailMsg] = useState(null);
+  const handleDailyEmail = async (value) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.patch(`${getApiBaseUrl()}/me`, { daily_email: value }, { headers: { Authorization: `Bearer ${token}` } });
+      const { access_token: newToken, ...updated } = response.data;
+      if (newToken) localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(updated));
+      setUser(updated);
+      showMsg(setMailMsg, value ? 'Дневното писмо е включено.' : 'Дневното писмо е спряно.');
+    } catch (err) {
+      showMsg(setMailMsg, err?.response?.data?.detail || 'Изборът не беше запазен.', true);
+    }
+  };
+  const handleTestMail = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${getApiBaseUrl()}/daily-transit/test-email`, {}, { headers: { Authorization: `Bearer ${token}` }, timeout: 90000 });
+      showMsg(setMailMsg, response.data?.message || 'Готово.', !response.data?.sent);
+    } catch (err) {
+      showMsg(setMailMsg, err?.response?.data?.detail || 'Писмото не беше изпратено.', true);
+    }
+  };
+
   const handleResendVerification = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -698,9 +722,19 @@ export default function Settings() {
       case 'notifications':
         return (
           <div className="flex flex-col gap-6">
+            <SectionCard title="Дневен транзит по имейл" description="Всяка сутрин в 08:00 (българско време)" icon="wb_sunny">
+              <div className="flex flex-col gap-3 text-sm text-slate-300 leading-relaxed">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" className="mt-1 accent-purple-600" checked={user?.daily_email !== false} onChange={(e) => handleDailyEmail(e.target.checked)} />
+                  <span><b className="text-white">Изпращай ми всяка сутрин „Обща картина“ за деня</b><br />Транзитите към вашата карта за 12:00, само обобщението. Включено по подразбиране; можете да го спрете тук или с връзката в писмото.</span>
+                </label>
+                <div><button type="button" onClick={handleTestMail} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white text-sm font-medium">Изпрати ми тестово писмо сега</button></div>
+                {mailMsg && <p role="status" className={`text-xs ${mailMsg.error ? 'text-red-300' : 'text-green-400'}`}>{mailMsg.text}</p>}
+              </div>
+            </SectionCard>
             <SectionCard title="Имейл" description="Какви писма изпращаме" icon="email">
               <div className="flex flex-col gap-3 text-sm text-slate-300 leading-relaxed">
-                <p>Изпращаме само писма за потвърждение на имейла и за нова парола. Други известия, дневен хороскоп и промоции няма.</p>
+                <p>Изпращаме писма за потвърждение на имейла, за нова парола и (ако е включено) дневния транзит. Промоции няма.</p>
                 <p>Писмата отиват на <span className="text-white font-medium">{user.email}</span>. За промяна на адреса отидете в <button onClick={() => setActiveTab('account')} className="text-[#5211d4] hover:underline font-medium">Акаунт</button>.</p>
               </div>
             </SectionCard>

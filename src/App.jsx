@@ -15,6 +15,7 @@ const Admin = lazy(() => import('./pages/Admin'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 const Welcome = lazy(() => import('./pages/Welcome'));
 const Start = lazy(() => import('./pages/Start'));
+const Unsubscribe = lazy(() => import('./pages/Unsubscribe'));
 const Legal = lazy(() => import('./pages/Legal'));
 
 // Старият адрес /buy-coins (линкове, запазени страници, връщане от плащане) води към новата страница, с параметрите
@@ -42,6 +43,7 @@ function App() {
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/start" element={<Start />} />
+        <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/legal/:doc" element={<Legal />} />
       </Routes>
       </Suspense>
