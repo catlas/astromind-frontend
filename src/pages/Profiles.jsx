@@ -6,6 +6,7 @@ import BirthMoment from '../components/BirthMoment';
 import { BirthPlaceSelect, BirthCoordinates } from '../components/BirthPlace';
 import { emptyPlace, parseCoordinates, placeFromProfile, placeLabel } from '../utils/birthPlace';
 import { accessLabel, balanceOf, formatEur } from '../utils/money';
+import { DateField, TimeField } from '../components/DateTimeFields';
 
 const relationOptions = [
   { value: 'self', label: 'Аз' },
@@ -590,8 +591,7 @@ const Profiles = () => {
                   {/* Birth Date */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-[#a69db9] mb-1.5">Дата на раждане</label>
-                    <input
-                      type="date"
+                    <DateField
                       value={form.birth_date}
                       onChange={(e) => handleChange('birth_date', e.target.value)}
                       className="w-full px-3 py-2.5 rounded-lg bg-[#131118] border border-slate-700 text-white text-sm focus:border-[#5211d4] focus:outline-none transition-colors"
@@ -612,8 +612,7 @@ const Profiles = () => {
                         <span className="text-xs text-[#a69db9]">Непознат час</span>
                       </label>
                     </div>
-                    <input
-                      type="time"
+                    <TimeField
                       value={form.birth_time}
                       onChange={(e) => handleChange('birth_time', e.target.value)}
                       disabled={form.unknown_time}

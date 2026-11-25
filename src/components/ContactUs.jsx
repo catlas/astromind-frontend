@@ -45,9 +45,9 @@ export default function ContactUs() {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)}
+      <button type="button" onClick={() => setOpen(true)} aria-label="Контакт с нас" title="Контакт с нас"
         className="fixed bottom-4 right-4 z-40 flex items-center gap-2 px-4 py-2 rounded-full bg-[#1f1c27]/95 border border-white/15 text-sm text-slate-200 hover:text-white hover:border-[#7c5dfa] shadow-lg backdrop-blur">
-        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>mail</span> Контакт с нас
+        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>mail</span><span className="hidden sm:inline">Контакт с нас</span>
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" role="dialog" aria-modal="true" aria-label="Контакт с нас" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { bulgarianCities } from '../utils/bulgarianCities';
+import { DateField, TimeField } from './DateTimeFields';
 
 export const inputClass = 'w-full bg-[#0B0616] border border-white/10 p-3 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#5211d4]';
 
@@ -33,11 +34,11 @@ const BirthDataForm = ({ form, setForm }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm text-slate-300 mb-1">Дата на раждане</label>
-          <input type="date" className={inputClass} value={form.birth_date} onChange={(e) => setField('birth_date', e.target.value)} required max={new Date().toISOString().split('T')[0]} />
+          <DateField className={inputClass} value={form.birth_date} onChange={(e) => setField('birth_date', e.target.value)} required max={new Date().toISOString().split('T')[0]} />
         </div>
         <div>
           <label className="block text-sm text-slate-300 mb-1">Час на раждане</label>
-          <input type="time" className={inputClass} value={form.birth_time} onChange={(e) => setField('birth_time', e.target.value)} disabled={form.unknown_time} required={!form.unknown_time} />
+          <TimeField className={inputClass} value={form.birth_time} onChange={(e) => setField('birth_time', e.target.value)} disabled={form.unknown_time} required={!form.unknown_time} />
           <label className="flex items-center gap-2 text-xs text-slate-400 mt-2">
             <input type="checkbox" checked={form.unknown_time} onChange={(e) => setField('unknown_time', e.target.checked)} className="accent-purple-600" />
             Не знам точния час

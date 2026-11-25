@@ -20,6 +20,7 @@ import {
   recallInputs, recallJob, recentFinishedJob, rememberInputs, rememberJob, waitText,
 } from '../utils/jobs';
 import DOMPurify from 'dompurify';
+import { DateField, TimeField } from '../components/DateTimeFields';
 
 // Менюто на мобилната странична лента (на компютър бутоните са изписани директно по-долу)
 const NAV_ITEMS = [
@@ -1192,8 +1193,7 @@ const GenerateReport = () => {
                     <label className="block text-sm font-medium mb-2 text-gray-300">
                       Дата на раждане <span className="text-red-400">*</span>
                     </label>
-                    <input
-                      type="date"
+                    <DateField
                       name="date"
                       value={formData.date}
                       onChange={handleChange}
@@ -1206,8 +1206,7 @@ const GenerateReport = () => {
                     <label className="block text-sm font-medium mb-2 text-gray-300">
                       Час на раждане {!unknownTime && <span className="text-red-400">*</span>}
                     </label>
-                    <input
-                      type="time"
+                    <TimeField
                       name="time"
                       value={formData.time}
                       onChange={handleChange}
@@ -1296,8 +1295,7 @@ const GenerateReport = () => {
                             <Calendar className="w-4 h-4 inline mr-1" />
                             Начална дата
                           </label>
-                          <input
-                            type="date"
+                          <DateField
                             value={transitData.target_date}
                             onChange={(e) => { setTargetTouched(true); setTransitData(prev => ({ ...prev, target_date: e.target.value })); }}
                             className="w-full px-4 py-2 bg-slate-700/50 border border-blue-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
@@ -1309,8 +1307,7 @@ const GenerateReport = () => {
                             <Calendar className="w-4 h-4 inline mr-1" />
                             Крайна дата <span className="text-red-400">*</span>
                           </label>
-                          <input
-                            type="date"
+                          <DateField
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
                             required={isDynamic}
@@ -1347,8 +1344,7 @@ const GenerateReport = () => {
                             <Calendar className="w-4 h-4 inline mr-1" />
                             Прогнозна дата
                           </label>
-                          <input
-                            type="date"
+                          <DateField
                             value={transitData.target_date}
                             onChange={(e) => { setTargetTouched(true); setTargetFold(null); setTransitData(prev => ({ ...prev, target_date: e.target.value })); }}
                             className="w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
@@ -1360,8 +1356,7 @@ const GenerateReport = () => {
                             <Clock className="w-4 h-4 inline mr-1" />
                             Прогнозен час
                           </label>
-                          <input
-                            type="time"
+                          <TimeField
                             value={transitData.target_time}
                             onChange={(e) => { setTargetTouched(true); setTargetFold(null); setTransitData(prev => ({ ...prev, target_time: e.target.value })); }}
                             className="w-full px-4 py-2 bg-slate-700/50 border border-purple-800/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-white"
@@ -1488,8 +1483,7 @@ const GenerateReport = () => {
                           <label className="block text-sm font-medium mb-2 text-gray-300">
                             Дата на раждане <span className="text-red-400">*</span>
                           </label>
-                          <input
-                            type="date"
+                          <DateField
                             name="partner_date"
                             value={partnerData.partner_date}
                             onChange={handlePartnerChange}
@@ -1502,8 +1496,7 @@ const GenerateReport = () => {
                           <label className="block text-sm font-medium mb-2 text-gray-300">
                             Час на раждане {!partnerUnknownTime && <span className="text-red-400">*</span>}
                           </label>
-                          <input
-                            type="time"
+                          <TimeField
                             name="partner_time"
                             value={partnerData.partner_time}
                             onChange={handlePartnerChange}
